@@ -1,0 +1,47 @@
+# Environment & Secrets
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+*.pfx
+
+# Private data files & spreadsheets
+private-data/
+templates/
+*.csv
+*.tsv
+*.xls
+*.xlsx
+*.xlsb
+*.ods
+*.pdf
+*.docx
+*.doc
+
+# Logs, Backups & Temp files
+*.log
+*.tmp
+*.temp
+*.bak
+*.old
+*.zip
+*.7z
+*.rar
+*.tar
+*.gz
+*backup*
+*.db
+*.sqlite*
+*.map
+
+# OS & Editor generated files
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+.DS_Store
+.idea/
+.vscode/
+*.sublime-project
+*.sublime-workspace

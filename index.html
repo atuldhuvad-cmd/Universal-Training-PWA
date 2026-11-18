@@ -1,0 +1,691 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Training Intelligence Platform</title>
+
+  <!-- PWA Metadata & Manifest -->
+  <link rel="manifest" href="./manifest.webmanifest">
+  <meta name="theme-color" content="#0D1B2E">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Training Intel">
+  <link rel="icon" href="./icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="./icons/icon-192.png">
+
+  <!-- Core Offline Stylesheets -->
+  <link rel="stylesheet" href="./css/style.css">
+  <link rel="stylesheet" href="./css/components.css">
+
+  <!-- Bundled Offline Vendor Libraries -->
+  <script src="./js/vendor/chart.umd.min.js"></script>
+  <script src="./js/vendor/jspdf.umd.min.js"></script>
+  <script src="./js/vendor/jspdf.plugin.autotable.min.js"></script>
+  <script src="./js/vendor/xlsx.full.min.js"></script>
+</head>
+<body>
+
+  <!-- ========================================================
+       TOP HEADER BAR
+       ======================================================== -->
+  <header class="app-header">
+    <div class="hdr-left">
+      <div class="brand-badge" title="Workforce Training Intelligence Platform">
+        <svg viewBox="0 0 44 44" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect width="44" height="44" rx="8" fill="#0D1B2E"/>
+          <path d="M19 8H25V19H36V25H25V36H19V25H8V19H19V8Z" fill="#00D4B4"/>
+          <circle cx="22" cy="22" r="4" fill="#0D1B2E"/>
+        </svg>
+      </div>
+      <div class="brand-info">
+        <input type="text" id="txtTrainingName" class="training-title-input" 
+               placeholder="Click to name training programme (or leave blank)..." title="Click to rename training programme">
+        <div class="district-meta">
+          <span>Health Department · Ahmedabad District, Gujarat</span>
+          <span class="badge">9 BLOCKS · 47 PHCs</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="hdr-actions">
+      <!-- Active Training Switcher Dropdown -->
+      <select id="selActiveTraining" class="filter-select" style="min-width: 180px; font-weight:600;" title="Switch active training programme">
+        <option value="cancer_baseline">Common Cancer Screening (Baseline Example)</option>
+      </select>
+
+      <button id="btnOpenNewTrainingModal" class="btn btn-teal btn-sm" title="Start a new training programme from scratch">
+        ➕ New Training
+      </button>
+
+      <button id="btnOpenLoadModal" class="btn btn-outline btn-sm" title="Manually edit or customize training load (sanctioned/target per facility & cadre)">
+        ⚙️ Set Training Load
+      </button>
+
+      <button id="btnOpenRecordBatchModal" class="btn btn-outline-teal btn-sm" title="Record newly completed training batch or add participants">
+        📥 Record Batch
+      </button>
+
+      <button id="btnOpenUploadModal" class="btn btn-outline btn-sm" title="Upload Google Form Joining Reports or new Master Staffing Excel">
+        📁 Ingest Excel
+      </button>
+
+      <button id="btnExportPDF" class="btn btn-teal btn-sm" title="Export exact print-ready 52-page district dossier">
+        📄 Export PDF
+      </button>
+
+      <button id="btnExportExcel" class="btn btn-outline btn-sm" title="Export 6-sheet formatted Excel workbook">
+        📊 Excel
+      </button>
+
+      <button id="btnInstallApp" class="btn btn-teal btn-sm" style="background:#FFB938; color:#07111F;" title="Install PWA to Desktop or Mobile Home Screen">
+        📲 Install App
+      </button>
+    </div>
+  </header>
+
+  <!-- ========================================================
+       TRAINING PROGRAMME SELECTION TABS
+       ======================================================== -->
+  <section class="training-selection-strip" id="trainingSelectionStrip">
+    <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; width:100%;">
+      <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+        <span style="font-size:11px; font-weight:700; color:var(--teal); text-transform:uppercase; letter-spacing:0.8px; display:flex; align-items:center; gap:5px;">
+          🎯 Select Programme:
+        </span>
+        <div id="trainingTabsContainer" style="display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
+          <!-- Dynamically populated training selection tabs -->
+        </div>
+      </div>
+      <div style="display:flex; gap:8px; align-items:center;">
+        <button id="btnBarNewTraining" class="btn btn-teal btn-sm" style="font-size:11px; padding:4px 10px;" title="Start a new training programme from scratch">
+          ➕ New Training
+        </button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========================================================
+       GLOBAL FILTER STRIP
+       ======================================================== -->
+  <section class="filter-strip" id="globalFilterStrip">
+    <div class="filter-group">
+      <span class="filter-label">Block:</span>
+      <select id="fBlock" class="filter-select">
+        <option value="">All Blocks (9)</option>
+      </select>
+    </div>
+
+    <div class="filter-group">
+      <span class="filter-label">Facility Type:</span>
+      <select id="fFacType" class="filter-select">
+        <option value="">All Types (PHC/CHC/etc)</option>
+      </select>
+    </div>
+
+    <div class="filter-group">
+      <span class="filter-label">Facility / PHC:</span>
+      <select id="fFacility" class="filter-select">
+        <option value="">All Facilities</option>
+      </select>
+    </div>
+
+    <div class="filter-group">
+      <span class="filter-label">Cadre:</span>
+      <select id="fCadre" class="filter-select">
+        <option value="">All Cadres</option>
+      </select>
+    </div>
+
+    <div class="filter-group" style="flex:1; min-width: 180px;">
+      <input type="text" id="txtGlobalSearch" class="filter-select" style="width: 100%;" 
+             placeholder="🔍 Search participant name, designation, subcentre...">
+    </div>
+
+    <button id="btnClearFilters" class="btn btn-outline btn-sm" title="Reset all active filters">
+      ✕ Clear
+    </button>
+  </section>
+
+  <!-- ========================================================
+       NAVIGATION TABS
+       ======================================================== -->
+  <nav class="tabs-nav" role="tablist">
+    <div class="nav-tab active" data-tab="0" role="tab">📊 Overview</div>
+    <div class="nav-tab" data-tab="1" role="tab">📈 Block-wise Progress</div>
+    <div class="nav-tab" data-tab="2" role="tab">📋 Facility Detail Table</div>
+    <div class="nav-tab" data-tab="3" role="tab">✅ Trained Staff List</div>
+    <div class="nav-tab" data-tab="4" role="tab">📅 Batch Planning</div>
+    <div class="nav-tab" data-tab="5" role="tab">🗺 Heat Map</div>
+  </nav>
+
+  <!-- ========================================================
+       MAIN APP PANES
+       ======================================================== -->
+  <main class="app-main">
+
+    <!-- TAB 0: OVERVIEW -->
+    <div class="tab-pane active" id="tabPane0">
+      <!-- Excess Warning Banner -->
+      <div class="banner banner-orange" id="excessBanner" style="display:none;">
+        <div style="display:flex; align-items:center; gap:10px;">
+          <span style="font-size:18px;">⚠️</span>
+          <span id="excessNoteText">16 participants trained beyond sanctioned posts — all are counted in the trained total.</span>
+        </div>
+        <span class="tag-excess" style="font-size:11px;">RULE 1 ACTIVE: NO CAPPING</span>
+      </div>
+
+      <!-- 6 KPI Stat Cards -->
+      <div class="kpi-grid">
+        <div class="kpi-card">
+          <div class="kpi-val" id="kpiTotalStaff">36</div>
+          <div class="kpi-lbl">Total Staff</div>
+          <div class="kpi-sub" style="color:var(--txt2)" id="kpiTotalStaffSub">Training Load</div>
+        </div>
+        <div class="kpi-card" style="border-top-color:#4DDB8A;">
+          <div class="kpi-val" id="kpiTrained" style="color:#4DDB8A;">700</div>
+          <div class="kpi-lbl">Trained Staff</div>
+          <div class="kpi-sub" id="kpiExcessSub">Valid Attendance</div>
+        </div>
+        <div class="kpi-card" style="border-top-color:#FF5252;">
+          <div class="kpi-val" id="kpiUntrained" style="color:#FF5252;">46</div>
+          <div class="kpi-lbl">Untrained Staff</div>
+          <div class="kpi-sub" style="color:#FF5252">Pending Coverage</div>
+        </div>
+        <div class="kpi-card" style="border-top-color:#00D4B4;">
+          <div class="kpi-val" id="kpiCoverage" style="color:#00D4B4;">94.3%</div>
+          <div class="kpi-lbl">Coverage Rate</div>
+          <div class="kpi-sub" style="color:#00D4B4">District Average</div>
+        </div>
+        <div class="kpi-card" style="border-top-color:#4D9FFF;">
+          <div class="kpi-val" id="kpiBlocks" style="color:#4D9FFF;">9</div>
+          <div class="kpi-lbl">Blocks</div>
+          <div class="kpi-sub" style="color:var(--txt2)">Ahmedabad District</div>
+        </div>
+        <div class="kpi-card" style="border-top-color:#B48FFF;">
+          <div class="kpi-val" id="kpiPHCs" style="color:#B48FFF;">47</div>
+          <div class="kpi-lbl">Facilities / PHCs</div>
+          <div class="kpi-sub" style="color:var(--txt2)">Health Centres</div>
+        </div>
+      </div>
+
+      <!-- 4 Interactive Charts -->
+      <div class="chart-grid">
+        <div class="chart-card">
+          <div class="chart-card-header">
+            <span class="chart-card-title">🍩 Training Coverage Status</span>
+            <span style="font-size:11px; color:var(--txt2)">Trained vs Untrained</span>
+          </div>
+          <div class="chart-wrapper">
+            <canvas id="chartStatusDonut"></canvas>
+          </div>
+        </div>
+
+        <div class="chart-card">
+          <div class="chart-card-header">
+            <span class="chart-card-title">📊 Cadre Coverage: Sanctioned vs Trained</span>
+            <span style="font-size:11px; color:var(--txt2)">Universal Cadre Breakdown</span>
+          </div>
+          <div class="chart-wrapper">
+            <canvas id="chartCadreBar"></canvas>
+          </div>
+        </div>
+
+        <div class="chart-card">
+          <div class="chart-card-header">
+            <span class="chart-card-title">📈 Block Performance Ranking</span>
+            <span style="font-size:11px; color:var(--txt2)">Ranked by Coverage %</span>
+          </div>
+          <div class="chart-wrapper">
+            <canvas id="chartBlockRank"></canvas>
+          </div>
+        </div>
+
+        <div class="chart-card">
+          <div class="chart-card-header">
+            <span class="chart-card-title">🏛 Block Volume: Staff vs Trained</span>
+            <span style="font-size:11px; color:var(--txt2)">Participant Distribution</span>
+          </div>
+          <div class="chart-wrapper">
+            <canvas id="chartBlockVol"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 1: BLOCK-WISE PROGRESS -->
+    <div class="tab-pane" id="tabPane1">
+      <div id="blockProgressContainer"></div>
+    </div>
+
+    <!-- TAB 2: FACILITY DETAIL TABLE -->
+    <div class="tab-pane" id="tabPane2">
+      <div class="table-card">
+        <div class="table-header-bar">
+          <div class="table-header-title">
+            <span>📋 Facility-wise Cadre Breakdown</span>
+            <span style="font-size:11.5px; font-weight:400; color:var(--txt2)">(Format: Sanctioned / Trained / Untrained)</span>
+          </div>
+          <div style="font-size:11.5px; color:var(--orange)">
+            *Orange cells indicate trained participants exceeding sanctioned posts
+          </div>
+        </div>
+        <div class="table-wrapper">
+          <table class="data-table">
+            <thead id="phcTableHead"></thead>
+            <tbody id="phcTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 3: TRAINED STAFF LIST -->
+    <div class="tab-pane" id="tabPane3">
+      <div class="table-card">
+        <div class="table-header-bar" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+          <div class="table-header-title">
+            <span>✅ Trained Personnel Roster</span>
+            <span id="staffRecordCount" class="badge">Showing 38 of 38 records</span>
+          </div>
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span style="font-size:12px; color:var(--txt2); font-weight:600;">Sort by:</span>
+            <select id="selStaffSort" class="filter-select" style="padding:4px 10px; font-size:12px; min-width:190px;">
+              <option value="block_desig" selected>Taluka / Block & Designation</option>
+              <option value="block_phc">Taluka / Block & PHC</option>
+              <option value="cadre_name">Cadre & Name</option>
+              <option value="name">Participant Name (A-Z)</option>
+              <option value="srno">Original Form Order</option>
+            </select>
+          </div>
+        </div>
+        <div class="table-wrapper">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th style="width:50px;">#</th>
+                <th class="text-left">Name of Participant</th>
+                <th>Cadre</th>
+                <th>Designation</th>
+                <th class="text-left">Place of Duty</th>
+                <th>Facility / PHC</th>
+                <th>Block</th>
+              </tr>
+            </thead>
+            <tbody id="trainedStaffTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 4: BATCH PLANNING -->
+    <div class="tab-pane" id="tabPane4">
+      <div id="batchPlanningContainer"></div>
+    </div>
+
+    <!-- TAB 5: HEAT MAP -->
+    <div class="tab-pane" id="tabPane5">
+      <!-- Section A: Block Matrix -->
+      <div class="hm-section">
+        <div class="hm-section-hdr">
+          <div class="hm-title">
+            <span>🏛 Section A — Block-wise Performance Matrix</span>
+          </div>
+          <div class="hm-legend">
+            <span class="hm-pill hm-bg-teal">≥100% Complete</span>
+            <span class="hm-pill hm-bg-green">75-99% High</span>
+            <span class="hm-pill hm-bg-amber">50-74% Medium</span>
+            <span class="hm-pill hm-bg-red">&lt;50% Urgent</span>
+            <span class="hm-pill hm-bg-orange">Over-Trained</span>
+            <span class="hm-pill hm-bg-na">N/A No Post</span>
+          </div>
+        </div>
+        <div class="table-card">
+          <div class="table-wrapper">
+            <table class="data-table">
+              <thead id="blockHeatMapHead"></thead>
+              <tbody id="blockHeatMapBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Section B: Facility Matrix -->
+      <div class="hm-section">
+        <div class="hm-section-hdr">
+          <div class="hm-title">
+            <span>🏥 Section B — Facility / PHC-wise Performance Matrix</span>
+          </div>
+          <div style="font-size:12px; color:var(--txt2)">
+            Click any cell to filter the rest of the application to that facility & cadre
+          </div>
+        </div>
+        <div class="table-card">
+          <div class="table-wrapper">
+            <table class="data-table">
+              <thead id="phcHeatMapHead"></thead>
+              <tbody id="phcHeatMapBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- ========================================================
+       UNIVERSAL DATA UPLOAD & GOOGLE FORM INGEST MODAL
+       ======================================================== -->
+  <div class="modal-overlay" id="uploadModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>📁 Ingest Training Data & Google Form Responses</h3>
+        <button class="close-btn" id="btnCloseUploadModal">✕</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="banner banner-blue" style="margin-bottom:16px;">
+          <span>
+            <b>Universal Ingest Engine:</b> Upload your Master Staffing file (official denominator) and Training Joining Report file (Google Form export / Excel). The engine automatically normalizes designations (e.g. <i>MO, M.O., Medical Officer, FHW, ANM, RFHW, CHO, C.H.O.</i>) and facility names (e.g. <i>PHC Gangad, Primary Health Centre, P.H.C., Sabsentar</i>).
+          </span>
+        </div>
+
+        <div style="margin-bottom:16px;">
+          <label class="filter-label" style="display:block; margin-bottom:4px;">Training Programme Title:</label>
+          <input type="text" id="txtUploadTrainingTitle" class="filter-select" style="width:100%;" 
+                 placeholder="Enter title (e.g. Common Cancer Screening Training, RCH ANM Refresher)...">
+        </div>
+
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:16px; margin-bottom:16px;">
+          <!-- Staffing File Drop -->
+          <div class="upload-drop-zone">
+            <input type="file" id="inputStaffingFile" accept=".xlsx,.xls,.csv">
+            <div class="upload-icon">📊</div>
+            <div style="font-weight:700; color:var(--txt); margin-bottom:4px;">1. Master Staffing File</div>
+            <div style="font-size:11.5px; color:var(--txt2);" id="lblStaffingFileName">
+              Official list of Facilities & Sanctioned posts (.xlsx, .csv)
+            </div>
+          </div>
+
+          <!-- Training Records File Drop -->
+          <div class="upload-drop-zone">
+            <input type="file" id="inputTrainingFile" accept=".xlsx,.xls,.csv">
+            <div class="upload-icon">📝</div>
+            <div style="font-weight:700; color:var(--txt); margin-bottom:4px;">2. Training Records File</div>
+            <div style="font-size:11.5px; color:var(--txt2);" id="lblTrainingFileName">
+              Google Form / Joining Report export with participants (.xlsx, .csv)
+            </div>
+          </div>
+        </div>
+
+        <div style="font-size:11.5px; color:var(--txt2); line-height:1.6;">
+          <b>Supported Formats:</b> Standard Gujarat Health Department staffing matrices and Google Form joining responses (English and Gujarati column headers like <i>ફરજ નું સ્થળ, NAME OF PHC, NAME OF TALUKA</i>).
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-outline" id="btnCancelUpload" onclick="document.getElementById('uploadModal').classList.remove('open')">Cancel</button>
+        <button class="btn btn-teal" id="btnProcessUpload">⚡ Process & Load Dashboard</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================
+       MODAL 1: START NEW TRAINING PROGRAMME
+       ======================================================== -->
+  <div class="modal-overlay" id="modalNewTraining">
+    <div class="modal-content" style="max-width: 860px;">
+      <div class="modal-header">
+        <h3>➕ Start New Universal Training Programme</h3>
+        <button class="close-btn" id="btnCloseNewTrainingModal">✕</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="banner banner-blue" style="margin-bottom:16px;">
+          <span>
+            <b>Universal Training Setup:</b> Define your training programme title, select which cadres are participating, and choose which facilities are included. The training will initialize with 0 trained staff, ready for you to record batches as sessions complete.
+          </span>
+        </div>
+
+        <!-- 1. Programme Title -->
+        <div style="margin-bottom:18px;">
+          <label class="filter-label" style="display:block; margin-bottom:5px;">1. Training Programme Title:</label>
+          <input type="text" id="txtNewProgTitle" class="filter-select" style="width:100%; font-size:14px; font-weight:600;" 
+                 placeholder="Enter training name (e.g. ASHA Emergency Care Module, RCH Refresher, Injectable DMPA)...">
+        </div>
+
+        <!-- 2. Cadre Selection -->
+        <div style="margin-bottom:18px;">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <label class="filter-label">2. Select Participating Staff Cadres:</label>
+            <span style="font-size:11px; color:var(--txt2);">Click to toggle selection</span>
+          </div>
+          <div class="cadre-selector-pills" id="newProgCadrePills">
+            <div class="cadre-pill-checkbox selected" data-cadre="MO">✓ Medical Officer (MO)</div>
+            <div class="cadre-pill-checkbox selected" data-cadre="AYUSH MO">✓ AYUSH MO</div>
+            <div class="cadre-pill-checkbox selected" data-cadre="CHO">✓ CHO</div>
+            <div class="cadre-pill-checkbox selected" data-cadre="SN">✓ Staff Nurse (SN)</div>
+            <div class="cadre-pill-checkbox selected" data-cadre="FHW">✓ FHW / ANM</div>
+            <div class="cadre-pill-checkbox selected" data-cadre="MPHW">✓ MPHW</div>
+            <div class="cadre-pill-checkbox" data-cadre="ASHA">+ ASHA</div>
+            <div class="cadre-pill-checkbox" data-cadre="LT">+ Lab Technician (LT)</div>
+            <div class="cadre-pill-checkbox" data-cadre="PHARMACIST">+ Pharmacist</div>
+          </div>
+          <div style="display:flex; gap:8px; align-items:center;">
+            <input type="text" id="txtCustomCadreInput" class="filter-select" style="max-width:220px;" placeholder="Add custom cadre...">
+            <button class="btn btn-outline btn-sm" id="btnAddCustomCadre">+ Add Cadre</button>
+          </div>
+        </div>
+
+        <!-- 3. Facility Selection -->
+        <div style="margin-bottom:18px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; flex-wrap:wrap; gap:8px;">
+            <label class="filter-label" id="lblFacCountTitle">3. Participating Facilities (Ahmedabad District - 59 Facilities):</label>
+            <div style="display:flex; gap:6px; flex-wrap:wrap;">
+              <button class="btn btn-outline btn-sm" id="btnSelectAllFacs">Select All 59</button>
+              <button class="btn btn-outline btn-sm" id="btnSelectPHCsOnly">Only PHCs (47)</button>
+              <button class="btn btn-outline btn-sm" id="btnSelectCHCsSDHs">Only CHCs/SDHs (12)</button>
+              <button class="btn btn-outline btn-sm" id="btnClearAllFacs">Clear All</button>
+            </div>
+          </div>
+          <div class="facility-selector-grid" id="newProgFacilityGrid"></div>
+        </div>
+
+        <!-- 4. Default Training Load -->
+        <div>
+          <label class="filter-label" style="display:block; margin-bottom:8px;">4. Initial Training Load (Trainees Target per Facility):</label>
+          <div style="display:flex; flex-direction:column; gap:10px; background:var(--surf2); padding:14px; border-radius:8px;">
+            <label style="font-size:13px; display:flex; align-items:center; gap:8px; cursor:pointer;">
+              <input type="radio" name="initLoadMode" value="cadre_fixed" checked>
+              <span><b>Set Target per Cadre:</b></span>
+              <input type="number" id="numLoadPerCadre" min="1" max="50" value="1" class="spinner-input" style="width:50px; padding:3px 6px; text-align:center;">
+              <span style="color:var(--txt2);">trainee(s) per selected cadre for each facility</span>
+            </label>
+            <label style="font-size:13px; display:flex; align-items:center; gap:8px; cursor:pointer;">
+              <input type="radio" name="initLoadMode" value="facility_pool">
+              <span style="color:var(--teal); font-weight:700;">★ Flexible Team Target (Facility Pool):</span>
+              <span>Any</span>
+              <input type="number" id="numLoadFacilityPool" min="1" max="100" value="2" class="spinner-input" style="width:50px; padding:3px 6px; text-align:center;">
+              <span style="color:var(--txt2);">participant(s) per facility across all selected categories</span>
+            </label>
+            <label style="font-size:13px; display:flex; align-items:center; gap:8px; cursor:pointer;">
+              <input type="radio" name="initLoadMode" value="zero">
+              <span><b>Initialize at 0:</b> Set targets later or import from staffing Excel</span>
+            </label>
+            <label style="font-size:13px; display:flex; align-items:center; gap:8px; cursor:pointer;">
+              <input type="radio" name="initLoadMode" value="manual">
+              <span><b>Open Training Load Grid immediately:</b> Customize targets facility-by-facility</span>
+            </label>
+
+            <!-- Dynamic Projected Load Banner -->
+            <div id="newProgLoadCalculationSummary" style="margin-top:6px; padding:10px 14px; background:rgba(0,212,180,0.12); border:1px solid rgba(0,212,180,0.3); border-radius:6px; font-size:12px; line-height:1.5;">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-outline" id="btnCancelNewTraining">Cancel</button>
+        <button class="btn btn-teal" id="btnCreateNewTraining">🚀 Initialize Training Programme</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================
+       MODAL 2: MANUAL TRAINING LOAD SETUP (FACILITY X CADRE)
+       ======================================================== -->
+  <div class="modal-overlay" id="modalTrainingLoad">
+    <div class="modal-content" style="max-width: 960px;">
+      <div class="modal-header">
+        <h3>⚙️ Manual Training Load Setup (Target / Sanctioned)</h3>
+        <button class="close-btn" id="btnCloseLoadModal">✕</button>
+      </div>
+
+      <div class="modal-body">
+        <!-- Quick Fill Tool -->
+        <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; background:var(--surf2); padding:10px 14px; border-radius:8px; margin-bottom:14px;">
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span class="filter-label">Quick Fill:</span>
+            <span>Set Target:</span>
+            <select id="selBulkCadre" class="filter-select" style="min-width:140px;"></select>
+            <span>To</span>
+            <input type="number" id="numBulkVal" class="spinner-input" value="1" min="0" style="width:50px;">
+            <button class="btn btn-outline btn-sm" id="btnApplyBulkLoad">Apply to All Facilities</button>
+          </div>
+          <div style="font-size:12px; color:var(--txt2);">
+            Grand Total Training Load: <b id="lblGrandTotalLoad" style="color:var(--teal); font-size:14px;">0</b>
+          </div>
+        </div>
+
+        <div class="table-wrapper load-matrix-table" style="max-height: 480px;">
+          <table class="data-table">
+            <thead id="loadMatrixTableHead"></thead>
+            <tbody id="loadMatrixTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-outline" id="btnCancelLoadModal">Cancel</button>
+        <button class="btn btn-teal" id="btnSaveTrainingLoad">💾 Save & Update Training Load</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================
+       MODAL 3: RECORD COMPLETED TRAINING BATCH
+       ======================================================== -->
+  <div class="modal-overlay" id="modalRecordBatch">
+    <div class="modal-content" style="max-width: 900px;">
+      <div class="modal-header">
+        <h3>📥 Record Completed Training Batch</h3>
+        <button class="close-btn" id="btnCloseBatchModal">✕</button>
+      </div>
+
+      <div class="modal-body">
+        <div style="display:grid; grid-template-columns: 2fr 1fr; gap:14px; margin-bottom:16px;">
+          <div>
+            <label class="filter-label" style="display:block; margin-bottom:4px;">Batch Session Name / Number:</label>
+            <input type="text" id="txtBatchTitle" class="filter-select" style="width:100%; font-weight:600;" 
+                   placeholder="e.g. Batch 1 - Dholka / Bavla (25-07-2026)">
+          </div>
+          <div>
+            <label class="filter-label" style="display:block; margin-bottom:4px;">Completion Date:</label>
+            <input type="date" id="txtBatchDate" class="filter-select" style="width:100%;">
+          </div>
+        </div>
+
+        <!-- Sub Tabs: File Upload vs Manual Entry -->
+        <div style="display:flex; gap:10px; border-bottom:1px solid var(--border); margin-bottom:14px;">
+          <button class="nav-tab active" id="tabSubBatchUpload" style="padding:8px 14px; font-size:12.5px;">📁 Upload Batch Joining Report</button>
+          <button class="nav-tab" id="tabSubBatchManual" style="padding:8px 14px; font-size:12.5px;">✍️ Manual Participant Entry</button>
+        </div>
+
+        <!-- Sub Tab 1: Upload Batch Joining File -->
+        <div id="subPaneBatchUpload">
+          <div class="upload-drop-zone" style="padding:28px 20px;">
+            <input type="file" id="inputBatchFile" accept=".xlsx,.xls,.csv">
+            <div class="upload-icon">📝</div>
+            <div style="font-weight:700; color:var(--txt); margin-bottom:4px;">Upload Batch Joining Report (Google Form / Excel)</div>
+            <div style="font-size:11.5px; color:var(--txt2);" id="lblBatchFileName">
+              Select or drop Google Form response CSV or attendance sheet
+            </div>
+          </div>
+          <div style="font-size:11.5px; color:var(--txt2); margin-top:10px; line-height:1.5;">
+            ✓ Automatically normalizes designations (e.g. <i>ANM, RFHW, CHO, AYUSH MO, M.O.</i>)<br>
+            ✓ Automatically matches PHC names and places of duty
+          </div>
+        </div>
+
+        <!-- Sub Tab 2: Manual Participant Entry -->
+        <div id="subPaneBatchManual" style="display:none;">
+          <div style="display:grid; grid-template-columns: 2fr 1fr 1.5fr 2fr 35px; gap:8px; font-size:11px; font-weight:700; color:var(--txt2); margin-bottom:6px; padding:0 4px;">
+            <div>Participant Name</div>
+            <div>Cadre</div>
+            <div>Facility / PHC</div>
+            <div>Place of Duty</div>
+            <div></div>
+          </div>
+          <div id="manualBatchRowsContainer" style="max-height: 280px; overflow-y: auto; padding-right:4px;"></div>
+          <button class="btn btn-outline btn-sm" id="btnAddManualBatchRow" style="margin-top:8px;">+ Add Participant Row</button>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-outline" id="btnCancelBatchModal">Cancel</button>
+        <button class="btn btn-teal" id="btnSubmitCompletedBatch">⚡ Save & Log Batch</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======================================================== -->
+  <!-- MODAL: PWA INSTALLATION & MOBILE SHORTCUT GUIDE           -->
+  <!-- ======================================================== -->
+  <div class="modal-overlay" id="modalInstallInstructions">
+    <div class="modal-content" style="max-width: 650px;">
+      <div class="modal-header">
+        <h3>📲 Install App & Add Shortcuts</h3>
+        <button class="close-btn" id="btnCloseInstallModal">✕</button>
+      </div>
+      <div class="modal-body" style="line-height:1.6; font-size:13px; color:var(--txt);">
+        <div class="banner banner-blue" style="margin-bottom:16px;">
+          <span>
+            <b>Universal Offline PWA:</b> You can use this platform 100% offline on any Windows desktop or install it as an app icon on Android and iPhone!
+          </span>
+        </div>
+
+        <div style="background:var(--bg3); border-radius:8px; padding:14px; margin-bottom:14px; border:1px solid var(--border);">
+          <h4 style="margin:0 0 8px 0; color:var(--teal); font-size:14px;">📱 Mobile (Android & iPhone):</h4>
+          <p style="margin:0 0 8px 0;">Visit the live secure link on your smartphone browser:</p>
+          <div style="background:var(--bg); padding:8px 12px; border-radius:6px; font-family:monospace; color:var(--gold); font-size:12px; margin-bottom:10px; word-break:break-all;">
+            https://atuldhuvad-cmd.github.io/Universal-Training-PWA/
+          </div>
+          <ul style="margin:0; padding-left:18px;">
+            <li><b>Android (Chrome):</b> Tap the three dots (⋮) in the top-right &rarr; Tap <b>"Install app"</b> or <b>"Add to Home screen"</b>.</li>
+            <li><b>iPhone / iPad (Safari):</b> Tap the Share button (square with arrow) &rarr; Scroll down & tap <b>"Add to Home Screen"</b>.</li>
+          </ul>
+        </div>
+
+        <div style="background:var(--bg3); border-radius:8px; padding:14px; margin-bottom:14px; border:1px solid var(--border);">
+          <h4 style="margin:0 0 8px 0; color:var(--teal); font-size:14px;">💻 Windows Desktop:</h4>
+          <ul style="margin:0; padding-left:18px;">
+            <li><b>Desktop Shortcut:</b> Run <code>Create_Desktop_Shortcut.bat</code> inside the app folder to instantly place a shortcut on your Windows desktop with the official icon.</li>
+            <li><b>Standalone App Mode:</b> Double-click <code>Launch_PWA.bat</code> to run the app as a dedicated, distraction-free desktop window without browser tabs or address bar.</li>
+            <li><b>Browser Install:</b> When opened in Chrome or Edge, click the <b>Install</b> (computer) icon in the URL omnibox to add it to your Windows Start Menu and Taskbar.</li>
+          </ul>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-teal" id="btnGotItInstallModal">Got it</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Application Logic Scripts -->
+  <script src="./js/dataset-cancer-master.js"></script>
+  <script src="./js/designation-mapper.js"></script>
+  <script src="./js/universal-engine.js"></script>
+  <script src="./js/report-pdf.js"></script>
+  <script src="./js/report-excel.js"></script>
+  <script src="./js/app.js"></script>
+</body>
+</html>
