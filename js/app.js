@@ -881,18 +881,23 @@
   function renderCharts() {
     if (!APP_STATE.data || typeof Chart === 'undefined') return;
 
-    const d = APP_STATE.data;
+    const fd = getFilteredData();
+    if (!fd) return;
 
-    // 1. Status Donut Chart
+    const f = APP_STATE.filters;
+
+    // 1. Status Donut Chart (Trained vs Untrained)
     const ctxStatus = document.getElementById('chartStatusDonut');
     if (ctxStatus) {
       if (APP_STATE.charts.status) APP_STATE.charts.status.destroy();
+      const tr = fd.kpi.total_trained || 0;
+      const un = fd.kpi.total_untrained || 0;
       APP_STATE.charts.status = new Chart(ctxStatus, {
         type: 'doughnut',
         data: {
           labels: ['Trained Staff', 'Untrained Staff'],
           datasets: [{
-            data: [d.kpi.total_trained, d.kpi.total_untrained],
+            data: (tr === 0 && un === 0) ? [0, 0] : [tr, un],
             backgroundColor: ['#00D4B4', '#FF5252'],
             borderColor: '#0D1B2E',
             borderWidth: 2
@@ -902,7 +907,17 @@
           responsive: true,
           maintainAspectRatio: false,
           plugins: {
-            legend: { position: 'bottom', labels: { color: '#DCE8F5', font: { size: 11 } } }
+            legend: { position: 'bottom', labels: { color: '#DCE8F5', font: { size: 11 } } },
+            tooltip: {
+              callbacks: {
+                label: (ctx) => {
+                  const val = ctx.raw || 0;
+                  const total = tr + un;
+                  const pct = total > 0 ? ((val / total) * 100).toFixed(1) : '0';
+                  return ` ${ctx.label}: ${val} (${pct}%)`;
+                }
+              }
+            }
           }
         }
       });
@@ -912,20 +927,47 @@
     const ctxCadre = document.getElementById('chartCadreBar');
     if (ctxCadre) {
       if (APP_STATE.charts.cadre) APP_STATE.charts.cadre.destroy();
+
+      // Determine cadres to display
+      let allCadres = [];
+      if (APP_STATE.data.cadre_data && APP_STATE.data.cadre_data.length > 0) {
+        allCadres = APP_STATE.data.cadre_data.map((c) => c.cadre);
+      } else {
+        allCadres = ['MO', 'CHO', 'SN', 'FHW', 'MPHW'];
+      }
+
+      const activeCadres = f.cadre ? [f.cadre] : allCadres;
+
+      const cadreLabels = [];
+      const cadreTargets = [];
+      const cadreTrained = [];
+
+      activeCadres.forEach((cadre) => {
+        let tLoad = 0;
+        let tTr = 0;
+        fd.phcs.forEach((p) => {
+          tLoad += (p[cadre] || 0);
+          tTr += (p[`${cadre}_tr`] || 0);
+        });
+        cadreLabels.push(cadre);
+        cadreTargets.push(tLoad);
+        cadreTrained.push(tTr);
+      });
+
       APP_STATE.charts.cadre = new Chart(ctxCadre, {
         type: 'bar',
         data: {
-          labels: d.cadre_data.map((c) => c.cadre),
+          labels: cadreLabels,
           datasets: [
             {
               label: 'Target Load',
-              data: d.cadre_data.map((c) => c.total),
+              data: cadreTargets,
               backgroundColor: '#1E4976',
               borderRadius: 4
             },
             {
               label: 'Trained',
-              data: d.cadre_data.map((c) => c.trained),
+              data: cadreTrained,
               backgroundColor: '#00D4B4',
               borderRadius: 4
             }
@@ -939,25 +981,93 @@
           },
           scales: {
             x: { ticks: { color: '#7A9BBF' }, grid: { display: false } },
-            y: { ticks: { color: '#7A9BBF' }, grid: { color: '#1A2E48' } }
+            y: { ticks: { color: '#7A9BBF', precision: 0 }, grid: { color: '#1A2E48' }, beginAtZero: true }
           }
         }
       });
     }
 
-    // 3. Block-wise Coverage Ranking
+    // 3 & 4. Block or Facility Performance Ranking and Volume
     const ctxBlockRank = document.getElementById('chartBlockRank');
+    const ctxBlockVol = document.getElementById('chartBlockVol');
+    const titleRank = document.getElementById('titleChartBlockRank');
+    const titleVol = document.getElementById('titleChartBlockVol');
+
+    // Grouping logic: If filtered to a single block or facility, show facilities (PHCs)
+    const uniqueBlocks = [...new Set(fd.phcs.map((p) => p.Block))];
+    const isSingleBlock = uniqueBlocks.length === 1;
+
+    let rankLabels = [];
+    let rankCoverage = [];
+    let rankColors = [];
+
+    let volLabels = [];
+    let volTargets = [];
+    let volTrained = [];
+
+    if (isSingleBlock) {
+      if (titleRank) titleRank.textContent = f.facility ? '📈 Facility Performance' : `📈 Facility Performance Ranking (${uniqueBlocks[0]})`;
+      if (titleVol) titleVol.textContent = f.facility ? '🏛 Facility Volume' : `🏛 Facility Volume (${uniqueBlocks[0]})`;
+
+      // Sort facilities by coverage descending
+      const sortedPHCs = [...fd.phcs].sort((a, b) => {
+        const cA = a.Total > 0 ? (a.Trained / a.Total) : 0;
+        const cB = b.Total > 0 ? (b.Trained / b.Total) : 0;
+        return cB - cA;
+      });
+
+      sortedPHCs.forEach((p) => {
+        const cov = p.Total > 0 ? Number(((p.Trained / p.Total) * 100).toFixed(1)) : 0;
+        rankLabels.push(p.PHC);
+        rankCoverage.push(cov);
+        rankColors.push(cov >= 75 ? '#4DDB8A' : cov >= 50 ? '#FFB938' : '#FF5252');
+
+        volLabels.push(p.PHC);
+        volTargets.push(p.Total);
+        volTrained.push(p.Trained);
+      });
+    } else {
+      if (titleRank) titleRank.textContent = '📈 Block Performance Ranking';
+      if (titleVol) titleVol.textContent = '🏛 Block Volume: Staff vs Trained';
+
+      // Aggregate by Block across filtered PHCs
+      const blockAgg = {};
+      fd.phcs.forEach((p) => {
+        if (!blockAgg[p.Block]) {
+          blockAgg[p.Block] = { Block: p.Block, Total: 0, Trained: 0 };
+        }
+        blockAgg[p.Block].Total += p.Total;
+        blockAgg[p.Block].Trained += p.Trained;
+      });
+
+      const blockList = Object.values(blockAgg).map((b) => {
+        b.Coverage = b.Total > 0 ? Number(((b.Trained / b.Total) * 100).toFixed(1)) : 0;
+        return b;
+      });
+
+      blockList.sort((a, b) => b.Coverage - a.Coverage);
+
+      blockList.forEach((b) => {
+        rankLabels.push(b.Block);
+        rankCoverage.push(b.Coverage);
+        rankColors.push(b.Coverage >= 75 ? '#4DDB8A' : b.Coverage >= 50 ? '#FFB938' : '#FF5252');
+
+        volLabels.push(b.Block);
+        volTargets.push(b.Total);
+        volTrained.push(b.Trained);
+      });
+    }
+
     if (ctxBlockRank) {
       if (APP_STATE.charts.blockRank) APP_STATE.charts.blockRank.destroy();
-      const sortedBlocks = [...d.block_data].sort((a, b) => b.Coverage - a.Coverage);
       APP_STATE.charts.blockRank = new Chart(ctxBlockRank, {
         type: 'bar',
         data: {
-          labels: sortedBlocks.map((b) => b.Block),
+          labels: rankLabels,
           datasets: [{
             label: 'Coverage %',
-            data: sortedBlocks.map((b) => b.Coverage),
-            backgroundColor: sortedBlocks.map((b) => b.Coverage >= 75 ? '#4DDB8A' : b.Coverage >= 50 ? '#FFB938' : '#FF5252'),
+            data: rankCoverage,
+            backgroundColor: rankColors,
             borderRadius: 4
           }]
         },
@@ -966,34 +1076,37 @@
           responsive: true,
           maintainAspectRatio: false,
           plugins: {
-            legend: { display: false }
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label: (ctx) => ` Coverage: ${ctx.raw}%`
+              }
+            }
           },
           scales: {
-            x: { max: 115, ticks: { color: '#7A9BBF', callback: (v) => v + '%' }, grid: { color: '#1A2E48' } },
-            y: { ticks: { color: '#DCE8F5' }, grid: { display: false } }
+            x: { max: Math.max(100, ...(rankCoverage.length ? rankCoverage : [100])), ticks: { color: '#7A9BBF', callback: (v) => v + '%' }, grid: { color: '#1A2E48' } },
+            y: { ticks: { color: '#DCE8F5', font: { size: rankLabels.length > 10 ? 9 : 11 } }, grid: { display: false } }
           }
         }
       });
     }
 
-    // 4. Block Staff vs Trained
-    const ctxBlockVol = document.getElementById('chartBlockVol');
     if (ctxBlockVol) {
       if (APP_STATE.charts.blockVol) APP_STATE.charts.blockVol.destroy();
       APP_STATE.charts.blockVol = new Chart(ctxBlockVol, {
         type: 'bar',
         data: {
-          labels: d.block_data.map((b) => b.Block),
+          labels: volLabels,
           datasets: [
             {
               label: 'Target Load',
-              data: d.block_data.map((b) => b.Total),
+              data: volTargets,
               backgroundColor: '#1E4976',
               borderRadius: 4
             },
             {
               label: 'Trained',
-              data: d.block_data.map((b) => b.Trained),
+              data: volTrained,
               backgroundColor: '#4D9FFF',
               borderRadius: 4
             }
@@ -1006,8 +1119,8 @@
             legend: { position: 'bottom', labels: { color: '#DCE8F5', font: { size: 11 } } }
           },
           scales: {
-            x: { ticks: { color: '#7A9BBF', font: { size: 10 } }, grid: { display: false } },
-            y: { ticks: { color: '#7A9BBF' }, grid: { color: '#1A2E48' } }
+            x: { ticks: { color: '#7A9BBF', font: { size: volLabels.length > 10 ? 9 : 10 } }, grid: { display: false } },
+            y: { ticks: { color: '#7A9BBF', precision: 0 }, grid: { color: '#1A2E48' }, beginAtZero: true }
           }
         }
       });
