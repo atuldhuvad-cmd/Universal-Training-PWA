@@ -397,31 +397,33 @@ const DesignationMapper = (function () {
 
     cleanHeaders.forEach((h, idx) => {
       const orig = headers[idx];
-      // Sr No
+      // 1. Sr No
       if (/^(SR|SR\.?NO|S\.NO|NO|INDEX)\b/i.test(h)) {
         if (!map.srNo) map.srNo = orig;
       }
-      // Beneficiary / Participant Name
-      else if (/NAME.*(BENEFICIARY|PARTICIPANT|STAFF|EMPLOYEE|PERSON)/i.test(h) ||
-               /^(BENEFICIARY\s*NAME|PARTICIPANT\s*NAME|NAME|કર્મચારીનું\s*નામ|નામ)/i.test(h)) {
-        if (!map.name) map.name = orig;
+      // 2. Taluka / Block (Check BEFORE generic name to prevent "NAME OF TALUKA" matching name)
+      else if (/TALUKA|BLOCK|તાલુકો/i.test(h)) {
+        if (!map.block) map.block = orig;
       }
-      // Designation
-      else if (/^(DESIGNATION|DESIG|CADRE|POST|હોદ્દો)/i.test(h) || /DESIGNATION/i.test(h)) {
-        if (!map.designation) map.designation = orig;
+      // 3. Facility / PHC (Check BEFORE generic name to prevent "NAME OF PHC" matching name)
+      else if (/^(NAME\s*OF\s*PHC|PHC\s*NAME|FACILITY\s*NAME|INSTITUTE|PHC|પીએચસી)/i.test(h) ||
+               (/(PHC|UPHC|CHC|SDH|HOSPITAL)/i.test(h) && !/OFFICE|DUTY|POSTING/i.test(h))) {
+        if (!map.facility) map.facility = orig;
       }
-      // Specific Place of Duty / Sub Centre / AAM
-      else if (/^(NAME\s*OF\s*PHC\/UPHC\/THO\s*OFFICE|PLACE\s*OF\s*DUTY|PLACE\s*OF\s*POSTING|DUTY\s*PLACE|સ્થળ|ફરજ)/i.test(h) ||
+      // 4. Place of Duty / Sub Centre / AAM
+      else if (/OFFICE|PLACE\s*OF\s*DUTY|PLACE\s*OF\s*POSTING|DUTY\s*PLACE|સ્થળ|ફરજ/i.test(h) ||
                /\(ફરજ.*સ્થળ.*નામ\)/i.test(h)) {
         if (!map.placeOfDuty) map.placeOfDuty = orig;
       }
-      // PHC / Facility
-      else if (/^(NAME\s*OF\s*PHC|PHC\s*NAME|FACILITY\s*NAME|INSTITUTE|PHC|પીએચસી)/i.test(h)) {
-        if (!map.facility) map.facility = orig;
+      // 5. Designation / Cadre
+      else if (/DESIGNATION|DESIG|CADRE|POST|હોદ્દો/i.test(h)) {
+        if (!map.designation) map.designation = orig;
       }
-      // Taluka / Block
-      else if (/^(NAME\s*OF\s*TALUKA|TALUKA\s*NAME|BLOCK\s*NAME|BLOCK|TALUKA|તાલુકો)/i.test(h)) {
-        if (!map.block) map.block = orig;
+      // 6. Beneficiary / Participant Name (Must NOT be facility or taluka name)
+      else if (/PARTICIPANT|BENEFICIARY|CANDIDATE|STAFF|EMPLOYEE|PERSON|TRAINEE/i.test(h) ||
+               /^(NAME|FULL\s*NAME|TRAINEE\s*NAME|કર્મચારીનું\s*નામ|નામ)$/i.test(h) ||
+               /^NAME\s*OF\b/i.test(h)) {
+        if (!map.name) map.name = orig;
       }
       // Place of duty type fallback
       else if (/^(ફરજ\s*નું\s*સ્થળ|TYPE\s*OF\s*FACILITY)/i.test(h)) {

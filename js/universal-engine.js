@@ -148,28 +148,59 @@ const UniversalEngine = (function () {
     const unmatchedParticipants = [];
     const matchedParticipants = [];
 
+    const colMap = trainingParticipantRows && trainingParticipantRows.length > 0
+      ? Mapper.detectColumnMapping(Object.keys(trainingParticipantRows[0]))
+      : {};
+
     (trainingParticipantRows || []).forEach((pRow, idx) => {
-      const rawBlock = pRow.Block || pRow['NAME OF TALUKA'] || pRow['Taluka'] || pRow['Block Name'] || '';
+      let rawBlock = colMap.block ? String(pRow[colMap.block] || '').trim() : '';
+      if (!rawBlock) {
+        rawBlock = String(pRow.Block || pRow['NAME OF TALUKA'] || pRow['Taluka'] || pRow['Block Name'] || '').trim();
+      }
       const normBlock = Mapper.normalizeTaluka(rawBlock);
 
-      const rawFacility = pRow.PHC || pRow['NAME OF PHC'] || pRow['PHC Name'] || pRow['Facility'] ||
-                          pRow['(ફરજ ના સ્થળનું નામ) NAME OF PHC/UPHC/THO OFFICE'] || '';
+      let rawFacility = colMap.facility ? String(pRow[colMap.facility] || '').trim() : '';
+      if (!rawFacility) {
+        rawFacility = String(pRow.PHC || pRow['NAME OF PHC'] || pRow['PHC Name'] || pRow['Facility'] || '').trim();
+      }
+      if (!rawFacility) {
+        rawFacility = String(pRow['(ફરજ ના સ્થળનું નામ) NAME OF PHC/UPHC/THO OFFICE'] || pRow['Place Of Duty'] || pRow.PlaceOfDuty || '').trim();
+      }
 
       // Match facility against master
       const masterList = Array.from(facilityMap.values());
       const matchResult = Mapper.matchFacilityWithMaster(rawFacility, normBlock, masterList);
 
-      const targetFacility = matchResult.matchedName;
-      const resolvedBlock = matchResult.suggestedBlock || normBlock;
+      const targetFacility = matchResult.matchedName || rawFacility || 'Other Facility';
+      const resolvedBlock = matchResult.suggestedBlock || normBlock || 'Other Block';
       const key = `${resolvedBlock}||${targetFacility}`;
 
       // Normalize designation & cadre
-      const rawDesig = pRow.Designation || pRow.DESIGNATION || pRow['designation'] || pRow.Cadre || '';
+      let rawDesig = colMap.designation ? String(pRow[colMap.designation] || '').trim() : '';
+      if (!rawDesig) {
+        rawDesig = String(pRow.Designation || pRow.DESIGNATION || pRow['designation'] || pRow.Cadre || '').trim();
+      }
       const desigNorm = Mapper.normalizeDesignation(rawDesig, cadres);
       const cadre = desigNorm.cadre;
 
-      const participantName = String(pRow.Name || pRow['Beneficiary Name'] || pRow['Participant Name'] || pRow['Name of Participant'] || '').trim();
-      const placeOfDuty = String(pRow.PlaceOfDuty || pRow['Place Of Duty'] || pRow['(ફરજ ના સ્થળનું નામ) NAME OF PHC/UPHC/THO OFFICE'] || pRow['ફરજ નું સ્થળ'] || '').trim();
+      let participantName = colMap.name ? String(pRow[colMap.name] || '').trim() : '';
+      if (!participantName) {
+        for (const k of Object.keys(pRow)) {
+          if (/NAME.*(PARTICIPANT|BENEFICIARY|STAFF|EMPLOYEE|PERSON|TRAINEE)/i.test(k) ||
+              /^(NAME|FULL\s*NAME|TRAINEE\s*NAME|કર્મચારીનું\s*નામ|નામ)$/i.test(k)) {
+            participantName = String(pRow[k] || '').trim();
+            if (participantName) break;
+          }
+        }
+      }
+      if (!participantName) {
+        participantName = String(pRow.Name || pRow['NAME of Participant (CAPITAL LETTER)'] || pRow['Beneficiary Name'] || pRow['Participant Name'] || pRow['Name of Participant'] || '').trim();
+      }
+
+      let placeOfDuty = colMap.placeOfDuty ? String(pRow[colMap.placeOfDuty] || '').trim() : '';
+      if (!placeOfDuty) {
+        placeOfDuty = String(pRow.PlaceOfDuty || pRow['Place Of Duty'] || pRow['(ફરજ ના સ્થળનું નામ) NAME OF PHC/UPHC/THO OFFICE'] || pRow['ફરજ નું સ્થળ'] || '').trim();
+      }
 
       const participant = {
         SrNo: idx + 1,

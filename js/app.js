@@ -2248,12 +2248,44 @@
     });
 
     // Ingest batch file
-    document.getElementById('inputBatchFile')?.addEventListener('change', function (e) {
+    const batchInput = document.getElementById('inputBatchFile');
+    batchInput?.addEventListener('change', function (e) {
+      if (!e.target.files?.[0]) return;
       handleFileUpload(e.target.files[0], (data) => {
         uploadedBatchParticipants = data;
         document.getElementById('lblBatchFileName').textContent = `✓ ${e.target.files[0].name} (${data.length} responses)`;
       });
     });
+
+    // Drag and drop support on batch upload drop zone
+    const dropZone = document.querySelector('#subPaneBatchUpload .upload-drop-zone');
+    if (dropZone) {
+      ['dragenter', 'dragover'].forEach((evt) => {
+        dropZone.addEventListener(evt, (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          dropZone.style.borderColor = 'var(--teal)';
+          dropZone.style.background = 'rgba(0, 212, 180, 0.05)';
+        });
+      });
+      ['dragleave', 'drop'].forEach((evt) => {
+        dropZone.addEventListener(evt, (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          dropZone.style.borderColor = '';
+          dropZone.style.background = '';
+        });
+      });
+      dropZone.addEventListener('drop', (e) => {
+        const file = e.dataTransfer?.files?.[0];
+        if (file) {
+          handleFileUpload(file, (data) => {
+            uploadedBatchParticipants = data;
+            document.getElementById('lblBatchFileName').textContent = `✓ ${file.name} (${data.length} responses)`;
+          });
+        }
+      });
+    }
 
     // Manual Participant Row Manager
     const container = document.getElementById('manualBatchRowsContainer');
@@ -2328,26 +2360,60 @@
 
         const masterList = APP_STATE.data.phc_data;
         const cadres = APP_STATE.data.cadres;
+        const colMap = DesignationMapper.detectColumnMapping(Object.keys(uploadedBatchParticipants[0]));
 
         uploadedBatchParticipants.forEach((pRow, idx) => {
-          const rawBlock = pRow.Block || pRow['NAME OF TALUKA'] || pRow['Taluka'] || pRow['Block Name'] || '';
+          // 1. Participant Name: Check detected column, then case-insensitive regex fallback across all keys
+          let pName = colMap.name ? String(pRow[colMap.name] || '').trim() : '';
+          if (!pName) {
+            for (const k of Object.keys(pRow)) {
+              if (/NAME.*(PARTICIPANT|BENEFICIARY|STAFF|EMPLOYEE|PERSON|TRAINEE)/i.test(k) ||
+                  /^(NAME|FULL\s*NAME|TRAINEE\s*NAME|કર્મચારીનું\s*નામ|નામ)$/i.test(k)) {
+                pName = String(pRow[k] || '').trim();
+                if (pName) break;
+              }
+            }
+          }
+          if (!pName) {
+            pName = String(pRow.Name || pRow['NAME of Participant (CAPITAL LETTER)'] || pRow['NAME of Participant'] || pRow['Beneficiary Name'] || pRow['Participant Name'] || pRow['Name of Participant'] || '').trim();
+          }
+
+          // 2. Taluka / Block
+          let rawBlock = colMap.block ? String(pRow[colMap.block] || '').trim() : '';
+          if (!rawBlock) {
+            rawBlock = String(pRow.Block || pRow['NAME OF TALUKA'] || pRow['Taluka'] || pRow['Block Name'] || '').trim();
+          }
           const normBlock = DesignationMapper.normalizeTaluka(rawBlock);
 
-          const rawFacility = pRow.PHC || pRow['NAME OF PHC'] || pRow['PHC Name'] || pRow['Facility'] ||
-                              pRow['(ફરજ ના સ્થળનું નામ) NAME OF PHC/UPHC/THO OFFICE'] || '';
+          // 3. Facility / PHC
+          let rawFacility = colMap.facility ? String(pRow[colMap.facility] || '').trim() : '';
+          if (!rawFacility) {
+            rawFacility = String(pRow.PHC || pRow['NAME OF PHC'] || pRow['PHC Name'] || pRow['Facility'] || '').trim();
+          }
+          if (!rawFacility) {
+            rawFacility = String(pRow['(ફરજ ના સ્થળનું નામ) NAME OF PHC/UPHC/THO OFFICE'] || pRow['Place Of Duty'] || pRow.PlaceOfDuty || '').trim();
+          }
 
           const matchResult = DesignationMapper.matchFacilityWithMaster(rawFacility, normBlock, masterList);
-          const targetFacility = matchResult.matchedName;
-          const resolvedBlock = matchResult.suggestedBlock || normBlock;
+          const targetFacility = matchResult.matchedName || rawFacility || 'Other Facility';
+          const resolvedBlock = matchResult.suggestedBlock || normBlock || 'Other Block';
 
-          const rawDesig = pRow.Designation || pRow.DESIGNATION || pRow['designation'] || pRow.Cadre || '';
+          // 4. Designation & Cadre
+          let rawDesig = colMap.designation ? String(pRow[colMap.designation] || '').trim() : '';
+          if (!rawDesig) {
+            rawDesig = String(pRow.Designation || pRow.DESIGNATION || pRow['designation'] || pRow.Cadre || '').trim();
+          }
           const desigNorm = DesignationMapper.normalizeDesignation(rawDesig, cadres);
 
-          const pName = String(pRow.Name || pRow['Beneficiary Name'] || pRow['Participant Name'] || pRow['Name of Participant'] || '').trim();
-          const pDuty = String(pRow.PlaceOfDuty || pRow['Place Of Duty'] || pRow['(ફરજ ના સ્થળનું નામ) NAME OF PHC/UPHC/THO OFFICE'] || pRow['ફરજ નું સ્થળ'] || '').trim();
+          // 5. Place of Duty
+          let pDuty = colMap.placeOfDuty ? String(pRow[colMap.placeOfDuty] || '').trim() : '';
+          if (!pDuty) {
+            pDuty = String(pRow['(ફરજ ના સ્થળનું નામ) NAME OF PHC/UPHC/THO OFFICE'] || pRow['Place Of Duty'] || pRow.PlaceOfDuty || pRow['ફરજ નું સ્થળ'] || '').trim();
+          }
 
           if (pName) {
             participantsToAdd.push({
+              SrNo: (APP_STATE.data.trained_list?.length || 0) + participantsToAdd.length + 1,
               Name: pName,
               Cadre: desigNorm.cadre,
               Designation: desigNorm.raw || desigNorm.cadre,
@@ -2360,27 +2426,75 @@
       }
 
       if (participantsToAdd.length === 0) {
-        alert('No valid participants were found to record.');
+        alert('No valid participants were found to record. Please ensure the uploaded sheet contains participant names and designations.');
         return;
       }
+
+      if (!APP_STATE.data.trained_list) APP_STATE.data.trained_list = [];
+      if (!APP_STATE.data.batches) APP_STATE.data.batches = [];
+
+      // Dynamically add any incoming cadre to APP_STATE.data.cadres if not already present
+      participantsToAdd.forEach((p) => {
+        if (!APP_STATE.data.cadres.includes(p.Cadre)) {
+          APP_STATE.data.cadres.push(p.Cadre);
+          // Initialize counters for all facilities
+          APP_STATE.data.phc_data.forEach((ph) => {
+            if (ph[p.Cadre] === undefined) ph[p.Cadre] = 0;
+            if (ph[`${p.Cadre}_tr`] === undefined) ph[`${p.Cadre}_tr`] = 0;
+            if (ph[`${p.Cadre}_un`] === undefined) ph[`${p.Cadre}_un`] = 0;
+            if (ph[`${p.Cadre}_ex`] === undefined) ph[`${p.Cadre}_ex`] = 0;
+          });
+        }
+      });
+      APP_STATE.data.cadreConfig = UniversalEngine.createCadreConfig(APP_STATE.data.cadres);
 
       // Merge into trained staff list and increment facility counts
       participantsToAdd.forEach((p) => {
         APP_STATE.data.trained_list.push(p);
 
         // Find matching PHC
-        const targetPHC = APP_STATE.data.phc_data.find((ph) => ph.Block === p.Block && ph.PHC === p.PHC) ||
-                          APP_STATE.data.phc_data.find((ph) => ph.PHC === p.PHC);
+        let targetPHC = APP_STATE.data.phc_data.find((ph) => ph.Block === p.Block && ph.PHC === p.PHC) ||
+                        APP_STATE.data.phc_data.find((ph) => ph.PHC === p.PHC);
 
-        if (targetPHC) {
-          targetPHC.Trained += 1;
-          targetPHC[`${p.Cadre}_tr`] = (targetPHC[`${p.Cadre}_tr`] || 0) + 1;
+        if (!targetPHC) {
+          targetPHC = {
+            Block: p.Block,
+            PHC: p.PHC,
+            FacilityType: DesignationMapper.detectFacilityType(p.PHC),
+            Total: 0,
+            Trained: 0,
+            Untrained: 0,
+            Excess: 0,
+            Coverage: 0
+          };
+          APP_STATE.data.cadres.forEach((c) => {
+            targetPHC[c] = 0;
+            targetPHC[`${c}_tr`] = 0;
+            targetPHC[`${c}_un`] = 0;
+            targetPHC[`${c}_ex`] = 0;
+          });
+          APP_STATE.data.phc_data.push(targetPHC);
         }
+
+        targetPHC.Trained = (targetPHC.Trained || 0) + 1;
+        targetPHC[`${p.Cadre}_tr`] = (targetPHC[`${p.Cadre}_tr`] || 0) + 1;
       });
 
-      // Recalculate everything
+      // Log the batch session in batches array
+      APP_STATE.data.batches.push({
+        id: `batch_${Date.now()}`,
+        batchName: batchTitle,
+        completionDate: document.getElementById('txtBatchDate')?.value || new Date().toISOString().split('T')[0],
+        participantCount: participantsToAdd.length,
+        participants: participantsToAdd
+      });
+
+      // Recalculate everything and persist to storage!
       recalculateActiveTraining();
+      saveTrainingsToStorage();
+      populateFilters();
       renderAllViews();
+      updateDynamicTitles();
 
       modal?.classList.remove('open');
       alert(`Success! Logged "${batchTitle}" with ${participantsToAdd.length} completed participants. Total trained staff is now ${APP_STATE.data.kpi.total_trained}.`);
@@ -2464,7 +2578,7 @@
     reader.onload = function (e) {
       try {
         const data = new Uint8Array(e.target.result);
-        const workbook = XLSX.read(data, { type: 'array' });
+        const workbook = XLSX.read(data, { type: 'array', codepage: 65001 });
         const sheetName = workbook.SheetNames[0];
         const json = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { defval: '' });
         callback(json);
