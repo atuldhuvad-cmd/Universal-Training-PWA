@@ -29,7 +29,7 @@
     activeTrainingId: 'cancer_baseline'
   };
 
-  // Canonical Ahmedabad District Master Facilities Reference (47 PHCs/UPHCs + 12 SDHs/CHCs = 59 Total)
+  // Canonical Ahmedabad District Master Facilities Reference (46 PHCs/UPHCs + 12 SDHs/CHCs + 9 THOs = 67 Total)
   const AHMEDABAD_MASTER_FACILITIES = [
     // BAVLA
     { Block: 'BAVLA', PHC: 'URBAN', FacilityType: 'UPHC' },
@@ -45,7 +45,6 @@
     { Block: 'DASCROI', PHC: 'KANBHA', FacilityType: 'PHC' },
     { Block: 'DASCROI', PHC: 'KASINDRA', FacilityType: 'PHC' },
     { Block: 'DASCROI', PHC: 'KUHA', FacilityType: 'PHC' },
-    { Block: 'DASCROI', PHC: 'NANDEJ', FacilityType: 'PHC' },
     { Block: 'DASCROI', PHC: 'VAHELAL', FacilityType: 'PHC' },
     { Block: 'DASCROI', PHC: 'KHODIYAR', FacilityType: 'PHC' },
     { Block: 'DASCROI', PHC: 'SDH SINGARVA', FacilityType: 'SDH' },
@@ -64,7 +63,7 @@
     { Block: 'DHANDHUKA', PHC: 'SDH DHANDHUKA', FacilityType: 'SDH' },
     // DHOLERA
     { Block: 'DHOLERA', PHC: 'BHADIYAD', FacilityType: 'PHC' },
-    { Block: 'DHOLERA', PHC: 'DHOLERA', FacilityType: 'PHC' },
+    { Block: 'DHOLERA', PHC: 'HEBATPURA', FacilityType: 'PHC' },
     { Block: 'DHOLERA', PHC: 'PIPLI', FacilityType: 'PHC' },
     { Block: 'DHOLERA', PHC: 'CHC DHOLERA', FacilityType: 'CHC' },
     // DHOLKA
@@ -141,37 +140,125 @@
       }
       APP_STATE.activeTrainingId = localStorage.getItem('wtip_active_training_id') || 'ab_shwp_tot';
 
-      // Auto-migrate any previously stored UPHC and Nandej/Khodiyar records
+      // Auto-migrate any previously stored UPHC, Nandej/Khodiyar, and Dholera/Hebatpura records
+      let anyMigrationChanged = false;
       Object.values(APP_STATE.customTrainings || {}).forEach((tr) => {
-        if (!tr || !tr.trained_list) return;
+        if (!tr) return;
         let changed = false;
-        tr.trained_list.forEach((p) => {
-          // 1. Nandej PHC -> Khodiyar PHC
-          if (p.Block === 'DASCROI' && (p.PHC === 'NANDEJ' || /NANDEJ\s*BAREJADI|PHC\s*NANDEJ|NADEJ/i.test(p.PHC || ''))) {
-            p.PHC = 'KHODIYAR';
-            changed = true;
-          }
-          // 2. UPHC variations -> URBAN
-          if (/(UPHC|URBAN|UHC)/i.test(p.PHC || '') || /(UPHC|URBAN)/i.test(p.PlaceOfDuty || '')) {
-            const urbanTarget = tr.phc_data?.find((ph) => ph.Block === p.Block && (ph.PHC === 'URBAN' || ph.FacilityType === 'UPHC'));
-            if (urbanTarget && p.PHC !== urbanTarget.PHC) {
-              p.PHC = urbanTarget.PHC;
+
+        // 1. Participant migration in trained_list
+        if (Array.isArray(tr.trained_list)) {
+          tr.trained_list.forEach((p) => {
+            // Nandej PHC -> Khodiyar PHC in Dascroi
+            if (p.Block === 'DASCROI' && (p.PHC === 'NANDEJ' || /NANDEJ\s*BAREJADI|PHC\s*NANDEJ|NADEJ/i.test(p.PHC || ''))) {
+              p.PHC = 'KHODIYAR';
               changed = true;
             }
-          }
-        });
+            // Dholera PHC / Hebatpur -> Hebatpura PHC in Dholera
+            if (p.Block === 'DHOLERA' && (p.PHC === 'DHOLERA' || /DHOLERA\s*PHC|PHC\s*DHOLERA/i.test(p.PHC || '') || /HEBATPUR/i.test(p.PHC || ''))) {
+              if (p.PHC !== 'CHC DHOLERA' && !/\bCHC\b/i.test(p.PHC || '')) {
+                p.PHC = 'HEBATPURA';
+                changed = true;
+              }
+            }
+            // UPHC variations -> URBAN
+            if (/(UPHC|URBAN|UHC)/i.test(p.PHC || '') || /(UPHC|URBAN)/i.test(p.PlaceOfDuty || '')) {
+              const urbanTarget = tr.phc_data?.find((ph) => ph.Block === p.Block && (ph.PHC === 'URBAN' || ph.FacilityType === 'UPHC'));
+              if (urbanTarget && p.PHC !== urbanTarget.PHC) {
+                p.PHC = urbanTarget.PHC;
+                changed = true;
+              }
+            }
+          });
+        }
 
-        if (changed) {
-          // Re-tally facility trained counts
-          tr.phc_data?.forEach((ph) => {
+        // 2. Participant migration in batches
+        if (Array.isArray(tr.batches)) {
+          tr.batches.forEach((b) => {
+            if (Array.isArray(b.participants)) {
+              b.participants.forEach((p) => {
+                if (p.Block === 'DASCROI' && (p.PHC === 'NANDEJ' || /NANDEJ\s*BAREJADI|PHC\s*NANDEJ|NADEJ/i.test(p.PHC || ''))) {
+                  p.PHC = 'KHODIYAR';
+                  changed = true;
+                }
+                if (p.Block === 'DHOLERA' && (p.PHC === 'DHOLERA' || /DHOLERA\s*PHC|PHC\s*DHOLERA/i.test(p.PHC || '') || /HEBATPUR/i.test(p.PHC || ''))) {
+                  if (p.PHC !== 'CHC DHOLERA' && !/\bCHC\b/i.test(p.PHC || '')) {
+                    p.PHC = 'HEBATPURA';
+                    changed = true;
+                  }
+                }
+                if (/(UPHC|URBAN|UHC)/i.test(p.PHC || '') || /(UPHC|URBAN)/i.test(p.PlaceOfDuty || '')) {
+                  const urbanTarget = tr.phc_data?.find((ph) => ph.Block === p.Block && (ph.PHC === 'URBAN' || ph.FacilityType === 'UPHC'));
+                  if (urbanTarget && p.PHC !== urbanTarget.PHC) {
+                    p.PHC = urbanTarget.PHC;
+                    changed = true;
+                  }
+                }
+              });
+            }
+          });
+        }
+
+        // 3. Facility consolidation in phc_data
+        if (Array.isArray(tr.phc_data)) {
+          // A. Nandej PHC consolidation into Khodiyar PHC in Dascroi
+          const nandejPHC = tr.phc_data.find((ph) => ph.Block === 'DASCROI' && ph.PHC === 'NANDEJ' && (ph.FacilityType === 'PHC' || !ph.FacilityType));
+          const khodiyarPHC = tr.phc_data.find((ph) => ph.Block === 'DASCROI' && ph.PHC === 'KHODIYAR');
+          if (nandejPHC) {
+            if (!khodiyarPHC) {
+              nandejPHC.PHC = 'KHODIYAR';
+              nandejPHC.FacilityType = 'PHC';
+            } else {
+              if ((!khodiyarPHC.Total || khodiyarPHC.Total === 0) && nandejPHC.Total > 0) {
+                khodiyarPHC.Total = nandejPHC.Total;
+                khodiyarPHC.facilityTarget = nandejPHC.facilityTarget || nandejPHC.Total;
+                khodiyarPHC.targetMode = nandejPHC.targetMode || 'pooled';
+                (tr.cadres || []).forEach((c) => {
+                  khodiyarPHC[c] = nandejPHC[c] || 0;
+                });
+              }
+              tr.phc_data = tr.phc_data.filter((ph) => !(ph.Block === 'DASCROI' && ph.PHC === 'NANDEJ' && (ph.FacilityType === 'PHC' || !ph.FacilityType)));
+            }
+            changed = true;
+          }
+
+          // B. Dholera PHC rename/consolidation to Hebatpura PHC in Dholera
+          const dholeraPHC = tr.phc_data.find((ph) => ph.Block === 'DHOLERA' && ph.PHC === 'DHOLERA' && (ph.FacilityType === 'PHC' || !ph.FacilityType));
+          const hebatpuraPHC = tr.phc_data.find((ph) => ph.Block === 'DHOLERA' && ph.PHC === 'HEBATPURA');
+          if (dholeraPHC) {
+            if (!hebatpuraPHC) {
+              dholeraPHC.PHC = 'HEBATPURA';
+              dholeraPHC.FacilityType = 'PHC';
+            } else {
+              if ((!hebatpuraPHC.Total || hebatpuraPHC.Total === 0) && dholeraPHC.Total > 0) {
+                hebatpuraPHC.Total = dholeraPHC.Total;
+                hebatpuraPHC.facilityTarget = dholeraPHC.facilityTarget || dholeraPHC.Total;
+                hebatpuraPHC.targetMode = dholeraPHC.targetMode || 'pooled';
+                (tr.cadres || []).forEach((c) => {
+                  hebatpuraPHC[c] = dholeraPHC[c] || 0;
+                });
+              }
+              tr.phc_data = tr.phc_data.filter((ph) => !(ph.Block === 'DHOLERA' && ph.PHC === 'DHOLERA' && (ph.FacilityType === 'PHC' || !ph.FacilityType)));
+            }
+            changed = true;
+          }
+        }
+
+        // 4. Re-tally all facility trained counts from trained_list
+        if (changed && Array.isArray(tr.phc_data)) {
+          anyMigrationChanged = true;
+          tr.phc_data.forEach((ph) => {
             ph.Trained = 0;
-            tr.cadres?.forEach((c) => {
+            (tr.cadres || []).forEach((c) => {
               if (ph[`${c}_tr`] !== undefined) ph[`${c}_tr`] = 0;
+              if (ph[`${c}_un`] !== undefined) ph[`${c}_un`] = ph[c] || 0;
+              if (ph[`${c}_ex`] !== undefined) ph[`${c}_ex`] = 0;
             });
           });
-          tr.trained_list.forEach((p) => {
-            const target = tr.phc_data?.find((ph) => ph.Block === p.Block && ph.PHC === p.PHC) ||
-                           tr.phc_data?.find((ph) => ph.PHC === p.PHC);
+
+          (tr.trained_list || []).forEach((p) => {
+            const target = tr.phc_data.find((ph) => ph.Block === p.Block && ph.PHC === p.PHC) ||
+                           tr.phc_data.find((ph) => ph.PHC === p.PHC);
             if (target) {
               target.Trained = (target.Trained || 0) + 1;
               if (p.Cadre) {
@@ -179,8 +266,98 @@
               }
             }
           });
+
+          // Re-calculate facility Untrained, Excess, Coverage
+          tr.phc_data.forEach((ph) => {
+            (tr.cadres || []).forEach((c) => {
+              const s = ph[c] || 0;
+              const trCount = ph[`${c}_tr`] || 0;
+              ph[`${c}_un`] = Math.max(0, s - trCount);
+              ph[`${c}_ex`] = Math.max(0, trCount - s);
+            });
+            ph.Untrained = Math.max(0, (ph.Total || 0) - (ph.Trained || 0));
+            ph.Excess = Math.max(0, (ph.Trained || 0) - (ph.Total || 0));
+            ph.Coverage = (ph.Total > 0) ? Number(((ph.Trained / ph.Total) * 100).toFixed(1)) : (ph.Trained > 0 ? 100 : 0);
+          });
+
+          // Block aggregation
+          const bAgg = {};
+          tr.phc_data.forEach((ph) => {
+            if (!bAgg[ph.Block]) {
+              bAgg[ph.Block] = {
+                Block: ph.Block,
+                Total: 0,
+                Trained: 0,
+                Untrained: 0,
+                Excess: 0,
+                Coverage: 0,
+                phcCount: 0
+              };
+              (tr.cadres || []).forEach((c) => {
+                bAgg[ph.Block][c] = 0;
+                bAgg[ph.Block][`${c}_tr`] = 0;
+                bAgg[ph.Block][`${c}_un`] = 0;
+                bAgg[ph.Block][`${c}_ex`] = 0;
+              });
+            }
+            const b = bAgg[ph.Block];
+            b.Total += (ph.Total || 0);
+            b.Trained += (ph.Trained || 0);
+            b.Untrained += (ph.Untrained || 0);
+            b.Excess += (ph.Excess || 0);
+            b.phcCount += 1;
+            (tr.cadres || []).forEach((c) => {
+              b[c] += (ph[c] || 0);
+              b[`${c}_tr`] += (ph[`${c}_tr`] || 0);
+              b[`${c}_un`] += (ph[`${c}_un`] || 0);
+              b[`${c}_ex`] += (ph[`${c}_ex`] || 0);
+            });
+          });
+
+          tr.block_data = Object.values(bAgg)
+            .sort((a, b) => a.Block.localeCompare(b.Block))
+            .map((b) => {
+              b.Coverage = b.Total > 0 ? Number(((b.Trained / b.Total) * 100).toFixed(1)) : 0;
+              return b;
+            });
+
+          // Cadre aggregation
+          tr.cadre_data = (tr.cadres || []).map((c) => {
+            let totalSanc = 0;
+            let totalTr = 0;
+            tr.phc_data.forEach((r) => {
+              totalSanc += (r[c] || 0);
+              totalTr += (r[`${c}_tr`] || 0);
+            });
+            const un = Math.max(0, totalSanc - totalTr);
+            const ex = Math.max(0, totalTr - totalSanc);
+            const cov = totalSanc > 0 ? Number(((totalTr / totalSanc) * 100).toFixed(1)) : 0;
+            return { cadre: c, total: totalSanc, trained: totalTr, untrained: un, excess: ex, coverage: cov };
+          });
+
+          // KPI aggregation
+          const totalStaff = tr.phc_data.reduce((acc, ph) => acc + (ph.Total || 0), 0);
+          const totalTrained = (tr.trained_list || []).length;
+          const totalUntrained = Math.max(0, totalStaff - totalTrained);
+          const covDistrict = totalStaff > 0 ? Number(((totalTrained / totalStaff) * 100).toFixed(1)) : 0;
+
+          tr.kpi = {
+            total_staff: totalStaff,
+            total_trained: totalTrained,
+            total_untrained: totalUntrained,
+            total_excess: tr.phc_data.reduce((acc, ph) => acc + (ph.Excess || 0), 0),
+            coverage: covDistrict,
+            blocks: tr.block_data.length,
+            phcs: tr.phc_data.length,
+            generated_date: tr.kpi?.generated_date || new Date().toLocaleDateString('en-IN')
+          };
+          tr.training_load = totalStaff;
         }
       });
+
+      if (anyMigrationChanged) {
+        saveTrainingsToStorage();
+      }
     } catch (e) {
       console.warn('Failed to parse saved trainings:', e);
       APP_STATE.customTrainings = {};
@@ -443,11 +620,11 @@
       { SrNo: 34, Name: "Participant (AYUSH MO-SANAND-34)", Prefix: "MRS", Cadre: "AYUSH MO", RawDesig: "AYUSH MO", DutyPlace: "PHC", PHC: "ZOLAPUR", Block: "SANAND" },
       { SrNo: 35, Name: "Participant (AYUSH MO-DHOLERA-35)", Prefix: "DR", Cadre: "AYUSH MO", RawDesig: "AYUSH MO", DutyPlace: "PHC", PHC: "PIPLI", Block: "DHOLERA" },
       { SrNo: 36, Name: "Participant (THO-DETROJ-36)", Prefix: "DR", Cadre: "THO", RawDesig: "THO", DutyPlace: "THO OFFICE", PHC: "KATOSAN ROAD", Block: "DETROJ" },
-      { SrNo: 37, Name: "Participant (AYUSH MO-DASCROI-37)", Prefix: "DR", Cadre: "AYUSH MO", RawDesig: "AYUSH MO", DutyPlace: "PHC", PHC: "NANDEJ", Block: "DASCROI" },
+      { SrNo: 37, Name: "Participant (AYUSH MO-DASCROI-37)", Prefix: "DR", Cadre: "AYUSH MO", RawDesig: "AYUSH MO", DutyPlace: "PHC", PHC: "KHODIYAR", Block: "DASCROI" },
       { SrNo: 38, Name: "Participant (MO-MANDAL-38)", Prefix: "DR", Cadre: "MO", RawDesig: "MO", DutyPlace: "PHC", PHC: "VITHALAPUR", Block: "MANDAL" }
     ];
 
-    // Master 47 PHCs of 9 Talukas
+    // Master 46 PHCs/UPHCs of 9 Talukas
     const phcMaster = AHMEDABAD_MASTER_FACILITIES.filter(f => f.FacilityType === 'PHC' || f.FacilityType === 'UPHC');
 
     const phcData = [];

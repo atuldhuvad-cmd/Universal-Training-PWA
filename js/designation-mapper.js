@@ -200,7 +200,18 @@ const DesignationMapper = (function () {
     'NADEJ': 'KHODIYAR',
     'NANDEJ BAREJADI': 'KHODIYAR',
     'BAREJADI': 'KHODIYAR',
-    'PHC NADEJ': 'KHODIYAR'
+    'PHC NADEJ': 'KHODIYAR',
+
+    // Dholera PHC is now Hebatpura PHC; CHC Dholera remains CHC
+    'DHOLERA PHC': 'HEBATPURA',
+    'PHC DHOLERA': 'HEBATPURA',
+    'HEBATPURA PHC': 'HEBATPURA',
+    'PHC HEBATPURA': 'HEBATPURA',
+    'HEBATPURA': 'HEBATPURA',
+    'HEBATPUR PHC': 'HEBATPURA',
+    'PHC HEBATPUR': 'HEBATPURA',
+    'HEBATPUR': 'HEBATPURA',
+    'PHC-HEBATPUR': 'HEBATPURA'
   };
 
   /**
@@ -443,7 +454,24 @@ const DesignationMapper = (function () {
       }
     }
 
-    // Special handling 3: THO Office (Administrative Postings across all blocks)
+    // Special handling 3: Dholera / Hebatpura in Dholera Block:
+    // "DHOLERA PHC now becomes Hebatpura PHC"
+    if ((!block || cleanString(block) === 'DHOLERA') && /\b(DHOLERA|HEBATPURA|HEBATPUR)\b/i.test(rawClean)) {
+      if (fType === 'CHC' || /\b(CHC|COMMUNITY\s*HEALTH)\b/i.test(rawClean)) {
+        const chcMatch = blockFacilities.find((m) => cleanString(m.PHC) === 'CHC DHOLERA');
+        if (chcMatch) {
+          return { matchedName: chcMatch.PHC, confidence: 1.0, facilityType: 'CHC', suggestedBlock: 'DHOLERA' };
+        }
+      } else {
+        const hebatpuraMatch = blockFacilities.find((m) => cleanString(m.PHC) === 'HEBATPURA');
+        if (hebatpuraMatch) {
+          return { matchedName: hebatpuraMatch.PHC, confidence: 1.0, facilityType: 'PHC', suggestedBlock: 'DHOLERA' };
+        }
+        return { matchedName: 'HEBATPURA', confidence: 0.95, facilityType: 'PHC', suggestedBlock: 'DHOLERA' };
+      }
+    }
+
+    // Special handling 4: THO Office (Administrative Postings across all blocks)
     if (cleanName === 'THO OFFICE' || fType === 'ADMIN' || /\b(THO|TALUKA\s*HEALTH\s*OFFICE)\b/i.test(rawClean)) {
       const thoMatch = blockFacilities.find((m) => cleanString(m.PHC) === 'THO OFFICE');
       if (thoMatch) {
