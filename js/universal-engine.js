@@ -167,6 +167,13 @@ const UniversalEngine = (function () {
         rawFacility = String(pRow['(ફરજ ના સ્થળનું નામ) NAME OF PHC/UPHC/THO OFFICE'] || pRow['Place Of Duty'] || pRow.PlaceOfDuty || '').trim();
       }
 
+      // Check for THO Office staff with NA / empty facility or duty at THO office
+      const checkDesig = String(pRow[colMap.designation] || pRow.Designation || pRow.DESIGNATION || pRow.Cadre || '').trim();
+      const checkDuty = String(pRow[colMap.placeOfDuty] || pRow.PlaceOfDuty || pRow['Place Of Duty'] || pRow['(ફરજ ના સ્થળનું નામ) NAME OF PHC/UPHC/THO OFFICE'] || pRow['ફરજ નું સ્થળ'] || '').trim();
+      if ((!rawFacility || /^(NA|N\/A|-|NONE|OFFICE)$/i.test(rawFacility)) && (/\b(THO|THV|TMPHS)\b/i.test(checkDesig) || /\b(THO|TALUKA\s*HEALTH\s*OFFICE)\b/i.test(checkDuty))) {
+        rawFacility = 'THO OFFICE';
+      }
+
       // Match facility against master
       const masterList = Array.from(facilityMap.values());
       const matchResult = Mapper.matchFacilityWithMaster(rawFacility, normBlock, masterList);
@@ -214,16 +221,33 @@ const UniversalEngine = (function () {
         RawFacility: rawFacility
       };
 
-      if (facilityMap.has(key)) {
-        const fac = facilityMap.get(key);
-        fac.trainedParticipants.push(participant);
-        fac.trainedCadre[cadre] = (fac.trainedCadre[cadre] || 0) + 1;
-        fac.Trained += 1;
-        matchedParticipants.push(participant);
-      } else {
-        // Unknown or unmatched facility
-        unmatchedParticipants.push(participant);
+      if (!facilityMap.has(key)) {
+        // Dynamic registration for THO Office and recognized district facilities
+        const newFac = {
+          Block: resolvedBlock,
+          PHC: targetFacility,
+          FacilityType: matchResult.facilityType || Mapper.detectFacilityType(targetFacility),
+          sanctioned: {},
+          Total: 0,
+          Trained: 0,
+          Untrained: 0,
+          Excess: 0,
+          Coverage: 0,
+          trainedCadre: {},
+          trainedParticipants: []
+        };
+        cadres.forEach((c) => {
+          newFac.sanctioned[c] = 0;
+          newFac.trainedCadre[c] = 0;
+        });
+        facilityMap.set(key, newFac);
       }
+
+      const fac = facilityMap.get(key);
+      fac.trainedParticipants.push(participant);
+      fac.trainedCadre[cadre] = (fac.trainedCadre[cadre] || 0) + 1;
+      fac.Trained += 1;
+      matchedParticipants.push(participant);
     });
 
     // 4. Calculate Final PHC-level Metrics (Rules 1, 2, 3)

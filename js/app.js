@@ -98,7 +98,17 @@
     { Block: 'VIRAMGAM', PHC: 'MANIPURA', FacilityType: 'PHC' },
     { Block: 'VIRAMGAM', PHC: 'VANSVA', FacilityType: 'PHC' },
     { Block: 'VIRAMGAM', PHC: 'URBAN', FacilityType: 'UPHC' },
-    { Block: 'VIRAMGAM', PHC: 'SDH VIRAMGAM', FacilityType: 'SDH' }
+    { Block: 'VIRAMGAM', PHC: 'SDH VIRAMGAM', FacilityType: 'SDH' },
+    // THO OFFICES (Taluka Health Offices - Valid Administrative Postings)
+    { Block: 'BAVLA', PHC: 'THO OFFICE', FacilityType: 'ADMIN' },
+    { Block: 'DASCROI', PHC: 'THO OFFICE', FacilityType: 'ADMIN' },
+    { Block: 'DETROJ', PHC: 'THO OFFICE', FacilityType: 'ADMIN' },
+    { Block: 'DHANDHUKA', PHC: 'THO OFFICE', FacilityType: 'ADMIN' },
+    { Block: 'DHOLERA', PHC: 'THO OFFICE', FacilityType: 'ADMIN' },
+    { Block: 'DHOLKA', PHC: 'THO OFFICE', FacilityType: 'ADMIN' },
+    { Block: 'MANDAL', PHC: 'THO OFFICE', FacilityType: 'ADMIN' },
+    { Block: 'SANAND', PHC: 'THO OFFICE', FacilityType: 'ADMIN' },
+    { Block: 'VIRAMGAM', PHC: 'THO OFFICE', FacilityType: 'ADMIN' }
   ];
 
   window.addEventListener('DOMContentLoaded', initApp);
@@ -1828,7 +1838,7 @@
       if (!facGrid) return;
       let h = '';
       AHMEDABAD_MASTER_FACILITIES.forEach((fac, idx) => {
-        const tagColor = fac.FacilityType === 'SDH' ? '#FF8C42' : fac.FacilityType === 'CHC' ? '#38D9F5' : 'var(--teal)';
+        const tagColor = fac.FacilityType === 'SDH' ? '#FF8C42' : fac.FacilityType === 'CHC' ? '#38D9F5' : fac.FacilityType === 'ADMIN' ? '#A78BFA' : 'var(--teal)';
         h += `
           <label class="fac-check-item">
             <input type="checkbox" name="facSelect" data-type="${fac.FacilityType}" value="${fac.Block}||${fac.PHC}" checked>
@@ -1850,6 +1860,7 @@
 
     const btnSelectPHCs = document.getElementById('btnSelectPHCsOnly');
     const btnSelectCHCs = document.getElementById('btnSelectCHCsSDHs');
+    const btnSelectTHOs = document.getElementById('btnSelectTHOsOnly');
 
     btnSelectAll?.addEventListener('click', () => {
       facGrid?.querySelectorAll('input[type="checkbox"]').forEach((cb) => (cb.checked = true));
@@ -1868,6 +1879,14 @@
       facGrid?.querySelectorAll('input[name="facSelect"]').forEach((cb) => {
         const t = cb.dataset.type;
         cb.checked = (t === 'CHC' || t === 'SDH');
+      });
+      updateModalLoadCalculationSummary();
+    });
+
+    btnSelectTHOs?.addEventListener('click', () => {
+      facGrid?.querySelectorAll('input[name="facSelect"]').forEach((cb) => {
+        const t = cb.dataset.type;
+        cb.checked = (t === 'ADMIN');
       });
       updateModalLoadCalculationSummary();
     });
@@ -2394,10 +2413,6 @@
             rawFacility = String(pRow['(ફરજ ના સ્થળનું નામ) NAME OF PHC/UPHC/THO OFFICE'] || pRow['Place Of Duty'] || pRow.PlaceOfDuty || '').trim();
           }
 
-          const matchResult = DesignationMapper.matchFacilityWithMaster(rawFacility, normBlock, masterList);
-          const targetFacility = matchResult.matchedName || rawFacility || 'Other Facility';
-          const resolvedBlock = matchResult.suggestedBlock || normBlock || 'Other Block';
-
           // 4. Designation & Cadre
           let rawDesig = colMap.designation ? String(pRow[colMap.designation] || '').trim() : '';
           if (!rawDesig) {
@@ -2410,6 +2425,15 @@
           if (!pDuty) {
             pDuty = String(pRow['(ફરજ ના સ્થળનું નામ) NAME OF PHC/UPHC/THO OFFICE'] || pRow['Place Of Duty'] || pRow.PlaceOfDuty || pRow['ફરજ નું સ્થળ'] || '').trim();
           }
+
+          // Recognize THO Office participants if facility is NA/empty or duty is THO office
+          if ((!rawFacility || /^(NA|N\/A|-|NONE|OFFICE)$/i.test(rawFacility)) && (/\b(THO|THV|TMPHS)\b/i.test(rawDesig) || /\b(THO|TALUKA\s*HEALTH\s*OFFICE)\b/i.test(pDuty))) {
+            rawFacility = 'THO OFFICE';
+          }
+
+          const matchResult = DesignationMapper.matchFacilityWithMaster(rawFacility, normBlock, masterList);
+          const targetFacility = matchResult.matchedName || rawFacility || 'Other Facility';
+          const resolvedBlock = matchResult.suggestedBlock || normBlock || 'Other Block';
 
           if (pName) {
             participantsToAdd.push({

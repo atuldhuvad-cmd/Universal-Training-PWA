@@ -49,6 +49,26 @@ const DesignationMapper = (function () {
     ],
     DEO: [
       'DEO', 'D.E.O.', 'DATA ENTRY OPERATOR', 'COMPUTER OPERATOR', 'ACCOUNTANT'
+    ],
+    THO: [
+      'THO', 'T.H.O.', 'T.H.O', 'TALUKA HEALTH OFFICER', 'TALUKA HEALTHOFFICER',
+      'TALUKA HEALTH OFFICER (THO)', 'DR THO', 'THO DR'
+    ],
+    THV: [
+      'THV', 'T.H.V.', 'T.H.V', 'TALUKA HEALTH VISITOR', 'HEALTH VISITOR (TALUKA)',
+      'TALUKA HV', 'THV/HV', 'HV TALUKA', 'TALUKA HEALTH VISITOR (THV)'
+    ],
+    TMPHS: [
+      'TMPHS', 'T.M.P.H.S.', 'T.M.P.H.S', 'TALUKA MPHS', 'TALUKA MULTI PURPOSE HEALTH SUPERVISOR',
+      'TALUKA MULTIPURPOSE HEALTH SUPERVISOR', 'TALUKA MALE MPHS', 'TALUKA HEALTH SUPERVISOR'
+    ],
+    MPHS: [
+      'MPHS', 'M.P.H.S.', 'M.P.H.S', 'MULTI PURPOSE HEALTH SUPERVISOR',
+      'MULTIPURPOSE HEALTH SUPERVISOR', 'HEALTH SUPERVISOR', 'MALE HEALTH SUPERVISOR'
+    ],
+    FHS: [
+      'FHS', 'F.H.S.', 'F.H.S', 'FHS/HV', 'FHS / HV', 'FEMALE HEALTH SUPERVISOR',
+      'HEALTH VISITOR', 'HV', 'LHV', 'LADY HEALTH VISITOR'
     ]
   };
 
@@ -120,7 +140,24 @@ const DesignationMapper = (function () {
     'BAREJA 3': 'JETALPUR',
     'VASAI': 'ASLALI',
     'MIROLI': 'ASLALI',
-    'PALDIKANKAJ': 'ASLALI'
+    'PALDIKANKAJ': 'ASLALI',
+    'THO': 'THO OFFICE',
+    'THO OFFICE': 'THO OFFICE',
+    'TALUKA HEALTH OFFICE': 'THO OFFICE',
+    'TALUKAMA HEALTH OFFICE': 'THO OFFICE',
+    'THO OFFICE DHANDHUKA': 'THO OFFICE',
+    'THO OFFICE MANDAL': 'THO OFFICE',
+    'DETROJ THO OFFICE': 'THO OFFICE',
+    'DASCROI THO OFFICE': 'THO OFFICE',
+    'TALUKA HEALTH OFFICE DHANDHUKA': 'THO OFFICE',
+    'TALUKAMA HEALTH OFFICE VIRAMGAM': 'THO OFFICE',
+    'THO OFFICE DASCROI': 'THO OFFICE',
+    'THO OFFICE DETROJ': 'THO OFFICE',
+    'THO OFFICE BAVLA': 'THO OFFICE',
+    'THO OFFICE DHOLERA': 'THO OFFICE',
+    'THO OFFICE DHOLKA': 'THO OFFICE',
+    'THO OFFICE SANAND': 'THO OFFICE',
+    'THO OFFICE VIRAMGAM': 'THO OFFICE'
   };
 
   /**
@@ -177,6 +214,21 @@ const DesignationMapper = (function () {
     }
 
     // Check for common prefix patterns
+    if (/\b(THO|TALUKA\s*HEALTH\s*OFFICER)\b/i.test(rawClean)) {
+      return { cadre: 'THO', raw: raw.trim(), confidence: 0.95 };
+    }
+    if (/\b(THV|TALUKA\s*HEALTH\s*VISITOR)\b/i.test(rawClean)) {
+      return { cadre: 'THV', raw: raw.trim(), confidence: 0.95 };
+    }
+    if (/\b(TMPHS|TALUKA\s*MPHS|TALUKA.*HEALTH\s*SUPERVISOR)\b/i.test(rawClean)) {
+      return { cadre: 'TMPHS', raw: raw.trim(), confidence: 0.95 };
+    }
+    if (/\b(MPHS|HEALTH\s*SUPERVISOR.*MALE|MALE.*HEALTH\s*SUPERVISOR)\b/i.test(rawClean)) {
+      return { cadre: 'MPHS', raw: raw.trim(), confidence: 0.95 };
+    }
+    if (/\b(FHS|LHV|FEMALE\s*HEALTH\s*SUPERVISOR|LADY\s*HEALTH\s*VISITOR|FHS\/HV)\b/i.test(rawClean)) {
+      return { cadre: 'FHS', raw: raw.trim(), confidence: 0.95 };
+    }
     if (/AYUSH|AYURVED|HOMEOPATH|BAMS|BHMS/i.test(rawClean)) {
       return { cadre: 'AYUSH MO', raw: raw.trim(), confidence: 0.95 };
     }
@@ -237,6 +289,11 @@ const DesignationMapper = (function () {
     // Specific known mappings
     if (PHC_NAME_FIXES[s]) {
       return PHC_NAME_FIXES[s];
+    }
+
+    // THO Office recognition
+    if (/\b(THO(\s*OFFICE)?|TALUKA\s*HEALTH\s*OFFICE|TALUKAMA\s*HEALTH\s*OFFICE)\b/i.test(s)) {
+      return 'THO OFFICE';
     }
 
     // Strip prefixes
@@ -324,6 +381,15 @@ const DesignationMapper = (function () {
       if (cleanString(mf.PHC) === cleanName) {
         return { matchedName: mf.PHC, confidence: 1.0, facilityType: mf.FacilityType || fType };
       }
+    }
+
+    // Special handling for THO Office (Administrative Postings across all blocks)
+    if (cleanName === 'THO OFFICE' || fType === 'ADMIN' || /\b(THO|TALUKA\s*HEALTH\s*OFFICE)\b/i.test(rawClean)) {
+      const thoMatch = blockFacilities.find((m) => cleanString(m.PHC) === 'THO OFFICE');
+      if (thoMatch) {
+        return { matchedName: 'THO OFFICE', confidence: 1.0, facilityType: 'ADMIN', suggestedBlock: block };
+      }
+      return { matchedName: 'THO OFFICE', confidence: 0.95, facilityType: 'ADMIN', suggestedBlock: block };
     }
 
     // Check if rawClean or cleanName is in known fixes
