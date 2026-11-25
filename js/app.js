@@ -140,6 +140,47 @@
         APP_STATE.customTrainings = JSON.parse(stored);
       }
       APP_STATE.activeTrainingId = localStorage.getItem('wtip_active_training_id') || 'ab_shwp_tot';
+
+      // Auto-migrate any previously stored UPHC and Nandej/Khodiyar records
+      Object.values(APP_STATE.customTrainings || {}).forEach((tr) => {
+        if (!tr || !tr.trained_list) return;
+        let changed = false;
+        tr.trained_list.forEach((p) => {
+          // 1. Nandej PHC -> Khodiyar PHC
+          if (p.Block === 'DASCROI' && (p.PHC === 'NANDEJ' || /NANDEJ\s*BAREJADI|PHC\s*NANDEJ|NADEJ/i.test(p.PHC || ''))) {
+            p.PHC = 'KHODIYAR';
+            changed = true;
+          }
+          // 2. UPHC variations -> URBAN
+          if (/(UPHC|URBAN|UHC)/i.test(p.PHC || '') || /(UPHC|URBAN)/i.test(p.PlaceOfDuty || '')) {
+            const urbanTarget = tr.phc_data?.find((ph) => ph.Block === p.Block && (ph.PHC === 'URBAN' || ph.FacilityType === 'UPHC'));
+            if (urbanTarget && p.PHC !== urbanTarget.PHC) {
+              p.PHC = urbanTarget.PHC;
+              changed = true;
+            }
+          }
+        });
+
+        if (changed) {
+          // Re-tally facility trained counts
+          tr.phc_data?.forEach((ph) => {
+            ph.Trained = 0;
+            tr.cadres?.forEach((c) => {
+              if (ph[`${c}_tr`] !== undefined) ph[`${c}_tr`] = 0;
+            });
+          });
+          tr.trained_list.forEach((p) => {
+            const target = tr.phc_data?.find((ph) => ph.Block === p.Block && ph.PHC === p.PHC) ||
+                           tr.phc_data?.find((ph) => ph.PHC === p.PHC);
+            if (target) {
+              target.Trained = (target.Trained || 0) + 1;
+              if (p.Cadre) {
+                target[`${p.Cadre}_tr`] = (target[`${p.Cadre}_tr`] || 0) + 1;
+              }
+            }
+          });
+        }
+      });
     } catch (e) {
       console.warn('Failed to parse saved trainings:', e);
       APP_STATE.customTrainings = {};
@@ -724,7 +765,10 @@
 
     selFacility.innerHTML = `<option value="">All Facilities (${filtered.length})</option>`;
     filtered.forEach((p) => {
-      selFacility.innerHTML += `<option value="${p.PHC}">${p.PHC} (${p.Block})</option>`;
+      const displayName = (p.FacilityType === 'UPHC' && p.PHC === 'URBAN')
+        ? `Urban [UPHC] (${p.Block})`
+        : `${p.PHC} (${p.Block})`;
+      selFacility.innerHTML += `<option value="${p.PHC}">${displayName}</option>`;
     });
   }
 

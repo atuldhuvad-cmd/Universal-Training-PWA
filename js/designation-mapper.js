@@ -157,7 +157,50 @@ const DesignationMapper = (function () {
     'THO OFFICE DHOLERA': 'THO OFFICE',
     'THO OFFICE DHOLKA': 'THO OFFICE',
     'THO OFFICE SANAND': 'THO OFFICE',
-    'THO OFFICE VIRAMGAM': 'THO OFFICE'
+    'THO OFFICE VIRAMGAM': 'THO OFFICE',
+
+    // UPHC (Urban Health Centre) mappings to 'URBAN'
+    'UPHC DHOLKA': 'URBAN',
+    'UPHC SANAND': 'URBAN',
+    'UPHC VIRAMGAM': 'URBAN',
+    'UPHC DHANDHUKA': 'URBAN',
+    'UPHC BAVLA': 'URBAN',
+    'DHOLKA UPHC': 'URBAN',
+    'SANAND UPHC': 'URBAN',
+    'VIRAMGAM UPHC': 'URBAN',
+    'DHANDHUKA UPHC': 'URBAN',
+    'BAVLA UPHC': 'URBAN',
+    'URBAN HEALTH CENTRE VIRAMGAM': 'URBAN',
+    'URBAN HEALTH CENTRE DHOLKA': 'URBAN',
+    'URBAN HEALTH CENTRE SANAND': 'URBAN',
+    'URBAN HEALTH CENTRE DHANDHUKA': 'URBAN',
+    'URBAN HEALTH CENTRE BAVLA': 'URBAN',
+    'URBAN HEALTH CENTRE': 'URBAN',
+    'URBAN HEALTH CENTER': 'URBAN',
+    'UPHC-1': 'URBAN',
+    'UPHC 1': 'URBAN',
+    'UPHC-2': 'URBAN',
+    'UPHC 2': 'URBAN',
+    'UPHC2': 'URBAN',
+    'BAVLA URBAN 1': 'URBAN',
+    'BAVLA URBAN': 'URBAN',
+    'DHOLKA URBAN': 'URBAN',
+    'SANAND URBAN': 'URBAN',
+    'VIRAMGAM URBAN': 'URBAN',
+    'DHANDHUKA URBAN': 'URBAN',
+    'UPHC': 'URBAN',
+    'U.P.H.C.': 'URBAN',
+    'U.P.H.C': 'URBAN',
+    'UHC': 'URBAN',
+
+    // Nandej PHC upgraded to CHC Nandej; all PHC staff considered as Khodiyar PHC
+    'PHC NANDEJ': 'KHODIYAR',
+    'NANDEJ PHC': 'KHODIYAR',
+    'NADEJ PHC': 'KHODIYAR',
+    'NADEJ': 'KHODIYAR',
+    'NANDEJ BAREJADI': 'KHODIYAR',
+    'BAREJADI': 'KHODIYAR',
+    'PHC NADEJ': 'KHODIYAR'
   };
 
   /**
@@ -369,6 +412,46 @@ const DesignationMapper = (function () {
       (m) => !block || cleanString(m.Block) === cleanString(block)
     );
 
+    // Special handling 1: Urban Primary Health Centres (UPHC / URBAN / Urban Health Centre)
+    // Matches UPHC DHOLKA, UPHC SANAND, UPHC Viramgam, UPHC DHANDHUKA, etc. to 'URBAN' in that block
+    if (fType === 'UPHC' || /(UPHC|URBAN|UHC|U\.P\.H\.C|URBAN\s*HEALTH)/i.test(rawClean)) {
+      const urbanMatch = blockFacilities.find((m) =>
+        (m.FacilityType || '').toUpperCase() === 'UPHC' ||
+        cleanString(m.PHC) === 'URBAN' ||
+        cleanString(m.PHC) === 'UPHC' ||
+        /^(URBAN|UPHC)$/i.test(cleanString(m.PHC))
+      );
+      if (urbanMatch) {
+        return { matchedName: urbanMatch.PHC, confidence: 1.0, facilityType: 'UPHC', suggestedBlock: block };
+      }
+    }
+
+    // Special handling 2: Nandej / Khodiyar in Dascroi Block:
+    // "Nandej PHC becomes now Nandej CHC and all staff of PHC Nandej is also consider as Khodiyar PHC"
+    if ((!block || cleanString(block) === 'DASCROI') && /\b(NANDEJ|NADEJ|BAREJADI)\b/i.test(rawClean)) {
+      if (fType === 'CHC' || /\b(CHC|COMMUNITY\s*HEALTH)\b/i.test(rawClean)) {
+        const chcMatch = blockFacilities.find((m) => cleanString(m.PHC) === 'CHC NANDEJ');
+        if (chcMatch) {
+          return { matchedName: chcMatch.PHC, confidence: 1.0, facilityType: 'CHC', suggestedBlock: 'DASCROI' };
+        }
+      } else {
+        const khodiyarMatch = blockFacilities.find((m) => cleanString(m.PHC) === 'KHODIYAR');
+        if (khodiyarMatch) {
+          return { matchedName: khodiyarMatch.PHC, confidence: 1.0, facilityType: 'PHC', suggestedBlock: 'DASCROI' };
+        }
+        return { matchedName: 'KHODIYAR', confidence: 0.95, facilityType: 'PHC', suggestedBlock: 'DASCROI' };
+      }
+    }
+
+    // Special handling 3: THO Office (Administrative Postings across all blocks)
+    if (cleanName === 'THO OFFICE' || fType === 'ADMIN' || /\b(THO|TALUKA\s*HEALTH\s*OFFICE)\b/i.test(rawClean)) {
+      const thoMatch = blockFacilities.find((m) => cleanString(m.PHC) === 'THO OFFICE');
+      if (thoMatch) {
+        return { matchedName: 'THO OFFICE', confidence: 1.0, facilityType: 'ADMIN', suggestedBlock: block };
+      }
+      return { matchedName: 'THO OFFICE', confidence: 0.95, facilityType: 'ADMIN', suggestedBlock: block };
+    }
+
     // Direct match against rawClean in block (e.g. "CHC BAVLA" === "CHC BAVLA")
     for (const mf of blockFacilities) {
       if (cleanString(mf.PHC) === rawClean) {
@@ -381,15 +464,6 @@ const DesignationMapper = (function () {
       if (cleanString(mf.PHC) === cleanName) {
         return { matchedName: mf.PHC, confidence: 1.0, facilityType: mf.FacilityType || fType };
       }
-    }
-
-    // Special handling for THO Office (Administrative Postings across all blocks)
-    if (cleanName === 'THO OFFICE' || fType === 'ADMIN' || /\b(THO|TALUKA\s*HEALTH\s*OFFICE)\b/i.test(rawClean)) {
-      const thoMatch = blockFacilities.find((m) => cleanString(m.PHC) === 'THO OFFICE');
-      if (thoMatch) {
-        return { matchedName: 'THO OFFICE', confidence: 1.0, facilityType: 'ADMIN', suggestedBlock: block };
-      }
-      return { matchedName: 'THO OFFICE', confidence: 0.95, facilityType: 'ADMIN', suggestedBlock: block };
     }
 
     // Check if rawClean or cleanName is in known fixes
