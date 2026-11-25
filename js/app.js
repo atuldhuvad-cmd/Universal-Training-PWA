@@ -63,7 +63,7 @@
     { Block: 'DHANDHUKA', PHC: 'SDH DHANDHUKA', FacilityType: 'SDH' },
     // DHOLERA
     { Block: 'DHOLERA', PHC: 'BHADIYAD', FacilityType: 'PHC' },
-    { Block: 'DHOLERA', PHC: 'HEBATPURA', FacilityType: 'PHC' },
+    { Block: 'DHOLERA', PHC: 'HEBATPUR', FacilityType: 'PHC' },
     { Block: 'DHOLERA', PHC: 'PIPLI', FacilityType: 'PHC' },
     { Block: 'DHOLERA', PHC: 'CHC DHOLERA', FacilityType: 'CHC' },
     // DHOLKA
@@ -154,10 +154,10 @@
               p.PHC = 'KHODIYAR';
               changed = true;
             }
-            // Dholera PHC / Hebatpur -> Hebatpura PHC in Dholera
+            // Dholera PHC / Hebatpur -> HEBATPUR in Dholera
             if (p.Block === 'DHOLERA' && (p.PHC === 'DHOLERA' || /DHOLERA\s*PHC|PHC\s*DHOLERA/i.test(p.PHC || '') || /HEBATPUR/i.test(p.PHC || ''))) {
               if (p.PHC !== 'CHC DHOLERA' && !/\bCHC\b/i.test(p.PHC || '')) {
-                p.PHC = 'HEBATPURA';
+                p.PHC = 'HEBATPUR';
                 changed = true;
               }
             }
@@ -183,7 +183,7 @@
                 }
                 if (p.Block === 'DHOLERA' && (p.PHC === 'DHOLERA' || /DHOLERA\s*PHC|PHC\s*DHOLERA/i.test(p.PHC || '') || /HEBATPUR/i.test(p.PHC || ''))) {
                   if (p.PHC !== 'CHC DHOLERA' && !/\bCHC\b/i.test(p.PHC || '')) {
-                    p.PHC = 'HEBATPURA';
+                    p.PHC = 'HEBATPUR';
                     changed = true;
                   }
                 }
@@ -201,45 +201,63 @@
 
         // 3. Facility consolidation in phc_data
         if (Array.isArray(tr.phc_data)) {
-          // A. Nandej PHC consolidation into Khodiyar PHC in Dascroi
-          const nandejPHC = tr.phc_data.find((ph) => ph.Block === 'DASCROI' && ph.PHC === 'NANDEJ' && (ph.FacilityType === 'PHC' || !ph.FacilityType));
-          const khodiyarPHC = tr.phc_data.find((ph) => ph.Block === 'DASCROI' && ph.PHC === 'KHODIYAR');
-          if (nandejPHC) {
-            if (!khodiyarPHC) {
-              nandejPHC.PHC = 'KHODIYAR';
-              nandejPHC.FacilityType = 'PHC';
-            } else {
-              if ((!khodiyarPHC.Total || khodiyarPHC.Total === 0) && nandejPHC.Total > 0) {
-                khodiyarPHC.Total = nandejPHC.Total;
-                khodiyarPHC.facilityTarget = nandejPHC.facilityTarget || nandejPHC.Total;
-                khodiyarPHC.targetMode = nandejPHC.targetMode || 'pooled';
-                (tr.cadres || []).forEach((c) => {
-                  khodiyarPHC[c] = nandejPHC[c] || 0;
-                });
+          // A. Dascroi: Consolidate NANDEJ PHC and KHODIYAR PHC into a single KHODIYAR PHC
+          const dascroiMatches = tr.phc_data.filter((ph) => ph.Block === 'DASCROI' && (ph.PHC === 'NANDEJ' || ph.PHC === 'KHODIYAR') && (ph.FacilityType === 'PHC' || !ph.FacilityType));
+          if (dascroiMatches.length > 0) {
+            let khodiyar = dascroiMatches.find((ph) => ph.PHC === 'KHODIYAR') || dascroiMatches[0];
+            khodiyar.PHC = 'KHODIYAR';
+            khodiyar.FacilityType = 'PHC';
+
+            let maxTotal = 0;
+            let targetMode = 'pooled';
+            let facilityTarget = 0;
+            dascroiMatches.forEach((ph) => {
+              if ((ph.Total || 0) > maxTotal) {
+                maxTotal = ph.Total;
+                targetMode = ph.targetMode || targetMode;
+                facilityTarget = ph.facilityTarget || ph.Total;
               }
-              tr.phc_data = tr.phc_data.filter((ph) => !(ph.Block === 'DASCROI' && ph.PHC === 'NANDEJ' && (ph.FacilityType === 'PHC' || !ph.FacilityType)));
-            }
+            });
+            khodiyar.Total = maxTotal || khodiyar.Total || 2;
+            khodiyar.targetMode = targetMode;
+            khodiyar.facilityTarget = facilityTarget || khodiyar.Total;
+
+            tr.phc_data = tr.phc_data.filter((ph) => {
+              if (ph.Block === 'DASCROI' && (ph.PHC === 'NANDEJ' || ph.PHC === 'KHODIYAR') && (ph.FacilityType === 'PHC' || !ph.FacilityType)) {
+                return ph === khodiyar;
+              }
+              return true;
+            });
             changed = true;
           }
 
-          // B. Dholera PHC rename/consolidation to Hebatpura PHC in Dholera
-          const dholeraPHC = tr.phc_data.find((ph) => ph.Block === 'DHOLERA' && ph.PHC === 'DHOLERA' && (ph.FacilityType === 'PHC' || !ph.FacilityType));
-          const hebatpuraPHC = tr.phc_data.find((ph) => ph.Block === 'DHOLERA' && ph.PHC === 'HEBATPURA');
-          if (dholeraPHC) {
-            if (!hebatpuraPHC) {
-              dholeraPHC.PHC = 'HEBATPURA';
-              dholeraPHC.FacilityType = 'PHC';
-            } else {
-              if ((!hebatpuraPHC.Total || hebatpuraPHC.Total === 0) && dholeraPHC.Total > 0) {
-                hebatpuraPHC.Total = dholeraPHC.Total;
-                hebatpuraPHC.facilityTarget = dholeraPHC.facilityTarget || dholeraPHC.Total;
-                hebatpuraPHC.targetMode = dholeraPHC.targetMode || 'pooled';
-                (tr.cadres || []).forEach((c) => {
-                  hebatpuraPHC[c] = dholeraPHC[c] || 0;
-                });
+          // B. Dholera: Consolidate any DHOLERA (PHC), HEBATPURA (PHC), and HEBATPUR (PHC) into a single HEBATPUR PHC
+          const dholeraMatches = tr.phc_data.filter((ph) => ph.Block === 'DHOLERA' && (ph.PHC === 'DHOLERA' || /HEBATPUR/i.test(ph.PHC)) && (ph.FacilityType === 'PHC' || !ph.FacilityType));
+          if (dholeraMatches.length > 0) {
+            let hebatpur = dholeraMatches.find((ph) => ph.PHC === 'HEBATPUR') || dholeraMatches[0];
+            hebatpur.PHC = 'HEBATPUR';
+            hebatpur.FacilityType = 'PHC';
+
+            let maxTotal = 0;
+            let targetMode = 'pooled';
+            let facilityTarget = 0;
+            dholeraMatches.forEach((ph) => {
+              if ((ph.Total || 0) > maxTotal) {
+                maxTotal = ph.Total;
+                targetMode = ph.targetMode || targetMode;
+                facilityTarget = ph.facilityTarget || ph.Total;
               }
-              tr.phc_data = tr.phc_data.filter((ph) => !(ph.Block === 'DHOLERA' && ph.PHC === 'DHOLERA' && (ph.FacilityType === 'PHC' || !ph.FacilityType)));
-            }
+            });
+            hebatpur.Total = maxTotal || hebatpur.Total || 2;
+            hebatpur.targetMode = targetMode;
+            hebatpur.facilityTarget = facilityTarget || hebatpur.Total;
+
+            tr.phc_data = tr.phc_data.filter((ph) => {
+              if (ph.Block === 'DHOLERA' && (ph.PHC === 'DHOLERA' || /HEBATPUR/i.test(ph.PHC)) && (ph.FacilityType === 'PHC' || !ph.FacilityType)) {
+                return ph === hebatpur;
+              }
+              return true;
+            });
             changed = true;
           }
         }
@@ -258,6 +276,11 @@
 
           (tr.trained_list || []).forEach((p) => {
             const target = tr.phc_data.find((ph) => ph.Block === p.Block && ph.PHC === p.PHC) ||
+                           tr.phc_data.find((ph) => ph.Block === p.Block && (
+                             (p.PHC === 'HEBATPUR' && /HEBATPUR/i.test(ph.PHC)) ||
+                             (p.PHC === 'KHODIYAR' && /KHODIYAR/i.test(ph.PHC)) ||
+                             (p.PHC === 'URBAN' && (ph.PHC === 'URBAN' || ph.FacilityType === 'UPHC'))
+                           )) ||
                            tr.phc_data.find((ph) => ph.PHC === p.PHC);
             if (target) {
               target.Trained = (target.Trained || 0) + 1;
@@ -2699,6 +2722,11 @@
 
         // Find matching PHC
         let targetPHC = APP_STATE.data.phc_data.find((ph) => ph.Block === p.Block && ph.PHC === p.PHC) ||
+                        APP_STATE.data.phc_data.find((ph) => ph.Block === p.Block && (
+                          (/HEBATPUR/i.test(p.PHC) && /HEBATPUR/i.test(ph.PHC)) ||
+                          (/KHODIYAR/i.test(p.PHC) && /KHODIYAR/i.test(ph.PHC)) ||
+                          (p.PHC === 'URBAN' && (ph.PHC === 'URBAN' || ph.FacilityType === 'UPHC'))
+                        )) ||
                         APP_STATE.data.phc_data.find((ph) => ph.PHC === p.PHC);
 
         if (!targetPHC) {

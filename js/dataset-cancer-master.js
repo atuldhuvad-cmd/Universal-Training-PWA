@@ -603,7 +603,7 @@ var CANCER_MASTER_DATA = {
     },
     {
       "Block": "DHOLERA",
-      "PHC": "HEBATPURA",
+      "PHC": "HEBATPUR",
       "Total": 12,
       "MO": 1,
       "MO_tr": 0,
@@ -4236,7 +4236,7 @@ var CANCER_MASTER_DATA = {
     },
     {
       "Block": "DHOLERA",
-      "PHC": "HEBATPURA",
+      "PHC": "HEBATPUR",
       "Cadre": "CHO",
       "Designation": "CHO",
       "Name": "Participant (CHO-DHOLERA-328)",
@@ -4244,7 +4244,7 @@ var CANCER_MASTER_DATA = {
     },
     {
       "Block": "DHOLERA",
-      "PHC": "HEBATPURA",
+      "PHC": "HEBATPUR",
       "Cadre": "SN",
       "Designation": "SN",
       "Name": "Participant (SN-DHOLERA-329)",
@@ -4252,7 +4252,7 @@ var CANCER_MASTER_DATA = {
     },
     {
       "Block": "DHOLERA",
-      "PHC": "HEBATPURA",
+      "PHC": "HEBATPUR",
       "Cadre": "FHW",
       "Designation": "FHW",
       "Name": "Participant (FHW-DHOLERA-330)",
@@ -4260,7 +4260,7 @@ var CANCER_MASTER_DATA = {
     },
     {
       "Block": "DHOLERA",
-      "PHC": "HEBATPURA",
+      "PHC": "HEBATPUR",
       "Cadre": "FHW",
       "Designation": "FHW",
       "Name": "Participant (FHW-DHOLERA-331)",
@@ -4268,7 +4268,7 @@ var CANCER_MASTER_DATA = {
     },
     {
       "Block": "DHOLERA",
-      "PHC": "HEBATPURA",
+      "PHC": "HEBATPUR",
       "Cadre": "FHW",
       "Designation": "FHW",
       "Name": "Participant (FHW-DHOLERA-332)",
@@ -4276,7 +4276,7 @@ var CANCER_MASTER_DATA = {
     },
     {
       "Block": "DHOLERA",
-      "PHC": "HEBATPURA",
+      "PHC": "HEBATPUR",
       "Cadre": "MPHW",
       "Designation": "MPHW",
       "Name": "Participant (MPHW-DHOLERA-333)",
@@ -4284,7 +4284,7 @@ var CANCER_MASTER_DATA = {
     },
     {
       "Block": "DHOLERA",
-      "PHC": "HEBATPURA",
+      "PHC": "HEBATPUR",
       "Cadre": "MPHW",
       "Designation": "MPHW",
       "Name": "Participant (MPHW-DHOLERA-334)",
@@ -4292,7 +4292,7 @@ var CANCER_MASTER_DATA = {
     },
     {
       "Block": "DHOLERA",
-      "PHC": "HEBATPURA",
+      "PHC": "HEBATPUR",
       "Cadre": "MPHW",
       "Designation": "MPHW",
       "Name": "Participant (MPHW-DHOLERA-335)",
@@ -4300,7 +4300,7 @@ var CANCER_MASTER_DATA = {
     },
     {
       "Block": "DHOLERA",
-      "PHC": "HEBATPURA",
+      "PHC": "HEBATPUR",
       "Cadre": "MPHW",
       "Designation": "MPHW",
       "Name": "Participant (MPHW-DHOLERA-336)",
@@ -4308,7 +4308,7 @@ var CANCER_MASTER_DATA = {
     },
     {
       "Block": "DHOLERA",
-      "PHC": "HEBATPURA",
+      "PHC": "HEBATPUR",
       "Cadre": "MPHW",
       "Designation": "MPHW",
       "Name": "Participant (MPHW-DHOLERA-337)",
@@ -7294,7 +7294,7 @@ var CANCER_MASTER_DATA = {
         },
         {
           "Block": "DHOLERA",
-          "PHC": "HEBATPURA",
+          "PHC": "HEBATPUR",
           "Total": 2,
           "MO": 1,
           "CHO": 0,

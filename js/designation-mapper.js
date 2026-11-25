@@ -202,16 +202,16 @@ const DesignationMapper = (function () {
     'BAREJADI': 'KHODIYAR',
     'PHC NADEJ': 'KHODIYAR',
 
-    // Dholera PHC is now Hebatpura PHC; CHC Dholera remains CHC
-    'DHOLERA PHC': 'HEBATPURA',
-    'PHC DHOLERA': 'HEBATPURA',
-    'HEBATPURA PHC': 'HEBATPURA',
-    'PHC HEBATPURA': 'HEBATPURA',
-    'HEBATPURA': 'HEBATPURA',
-    'HEBATPUR PHC': 'HEBATPURA',
-    'PHC HEBATPUR': 'HEBATPURA',
-    'HEBATPUR': 'HEBATPURA',
-    'PHC-HEBATPUR': 'HEBATPURA'
+    // Dholera PHC is now Hebatpur PHC; CHC Dholera remains CHC
+    'DHOLERA PHC': 'HEBATPUR',
+    'PHC DHOLERA': 'HEBATPUR',
+    'HEBATPURA PHC': 'HEBATPUR',
+    'PHC HEBATPURA': 'HEBATPUR',
+    'HEBATPURA': 'HEBATPUR',
+    'HEBATPUR PHC': 'HEBATPUR',
+    'PHC HEBATPUR': 'HEBATPUR',
+    'HEBATPUR': 'HEBATPUR',
+    'PHC-HEBATPUR': 'HEBATPUR'
   };
 
   /**
@@ -454,8 +454,8 @@ const DesignationMapper = (function () {
       }
     }
 
-    // Special handling 3: Dholera / Hebatpura in Dholera Block:
-    // "DHOLERA PHC now becomes Hebatpura PHC"
+    // Special handling 3: Dholera / Hebatpur in Dholera Block:
+    // "DHOLERA PHC now becomes Hebatpur PHC"
     if ((!block || cleanString(block) === 'DHOLERA') && /\b(DHOLERA|HEBATPURA|HEBATPUR)\b/i.test(rawClean)) {
       if (fType === 'CHC' || /\b(CHC|COMMUNITY\s*HEALTH)\b/i.test(rawClean)) {
         const chcMatch = blockFacilities.find((m) => cleanString(m.PHC) === 'CHC DHOLERA');
@@ -463,11 +463,11 @@ const DesignationMapper = (function () {
           return { matchedName: chcMatch.PHC, confidence: 1.0, facilityType: 'CHC', suggestedBlock: 'DHOLERA' };
         }
       } else {
-        const hebatpuraMatch = blockFacilities.find((m) => cleanString(m.PHC) === 'HEBATPURA');
-        if (hebatpuraMatch) {
-          return { matchedName: hebatpuraMatch.PHC, confidence: 1.0, facilityType: 'PHC', suggestedBlock: 'DHOLERA' };
+        const hebatpurMatch = blockFacilities.find((m) => cleanString(m.PHC) === 'HEBATPUR' || cleanString(m.PHC) === 'HEBATPURA');
+        if (hebatpurMatch) {
+          return { matchedName: hebatpurMatch.PHC, confidence: 1.0, facilityType: 'PHC', suggestedBlock: 'DHOLERA' };
         }
-        return { matchedName: 'HEBATPURA', confidence: 0.95, facilityType: 'PHC', suggestedBlock: 'DHOLERA' };
+        return { matchedName: 'HEBATPUR', confidence: 0.95, facilityType: 'PHC', suggestedBlock: 'DHOLERA' };
       }
     }
 
